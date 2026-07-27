@@ -1,4 +1,5 @@
 #\!/bin/bash
+set -euo pipefail
 # Stop hook — tears down Docker services and releases the lock file
 # Prevents orphaned containers and stale locks on agent crash/exit
 

@@ -51,15 +51,3 @@ func HashArrayToBytes32Array(hashes []common.Hash) [][32]byte {
 	}
 	return bytes32Array
 }
-
-func RequireNoError(err error) {
-	if err != nil {
-		FatalWithCause(err)
-	}
-}
-
-func RequireTrue(condition bool, message string) {
-	if !condition {
-		FatalWithCause(errors.New(message))
-	}
-}

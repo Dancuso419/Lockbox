@@ -64,7 +64,7 @@ func diagAvailabilityCheckRevert(
 		return
 	}
 
-	revertData := extractRevertData(callErr)
+	revertData := ExtractRevertData(callErr)
 	if len(revertData) == 0 {
 		logger.Warnf("diag: eth_call error has no revert data: %v", callErr)
 		return
@@ -113,7 +113,7 @@ func diagAvailabilityCheckRevert(
 	logger.Errorf("diag: revert with unknown selector 0x%x; full data: 0x%x", selector, revertData)
 }
 
-func extractRevertData(err error) []byte {
+func ExtractRevertData(err error) []byte {
 	if err == nil {
 		return nil
 	}

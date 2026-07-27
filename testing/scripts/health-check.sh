@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Watchdog script — checks if testing agents are alive, restarts dead ones
 # Run via system cron every 5 minutes:
 #   */5 * * * * /absolute/path/to/testing/scripts/health-check.sh

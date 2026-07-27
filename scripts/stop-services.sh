@@ -69,6 +69,13 @@ if [[ "$USE_LOCAL" == "true" ]]; then
 else
     # --- Stop Docker Compose services ---
     COMPOSE_FILES=("-f" "$PROJECT_DIR/docker-compose.yaml")
+
+    # Mirror start-services.sh: include the siblings overlay when active so
+    # compose resolves the same project/services that were started.
+    case "${USE_LOCAL_SIBLINGS:-}" in
+        1|true|yes|on) COMPOSE_FILES+=("-f" "$PROJECT_DIR/docker-compose.siblings.yaml") ;;
+    esac
+
     case "$CHAIN" in
         local) ;;
         coston)  COMPOSE_FILES+=("-f" "$PROJECT_DIR/docker-compose.coston.yaml") ;;

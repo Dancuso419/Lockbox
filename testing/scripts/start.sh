@@ -60,7 +60,7 @@ else
   log "ngrok URL: $NGROK_URL"
   # Update .env with ngrok URL (only if EXT_PROXY_URL line exists)
   if grep -q "^EXT_PROXY_URL=" "$REPO_ROOT/.env" 2>/dev/null; then
-    sed -i "s|^EXT_PROXY_URL=.*|EXT_PROXY_URL=$NGROK_URL|" "$REPO_ROOT/.env"
+    sed -i.bak "s|^EXT_PROXY_URL=.*|EXT_PROXY_URL=$NGROK_URL|" "$REPO_ROOT/.env" && rm -f "$REPO_ROOT/.env.bak"
   else
     echo "EXT_PROXY_URL=$NGROK_URL" >> "$REPO_ROOT/.env"
   fi

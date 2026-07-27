@@ -15,8 +15,6 @@ set -euo pipefail
 #   - ngrok
 #   - tmux, jq, git, curl
 
-set -euo pipefail
-
 GO_VERSION="1.25.1"
 GO_ARCH="linux-amd64"
 
@@ -155,7 +153,7 @@ echo "   claude /login"
 echo ""
 echo "4. Clone the repo and start the agents:"
 echo "   git clone <repo-url> tee"
-echo "   cd tee/extension-examples/orderbook"
+echo "   cd tee/extension-examples/extension-scaffold"
 echo "   cp .env.example .env"
 echo "   # Edit .env: set CHAIN_URL, DEPLOYMENT_PRIVATE_KEY, etc."
 echo "   bash testing/scripts/setup.sh"

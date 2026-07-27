@@ -25,17 +25,13 @@ const (
 	ExtensionPort        = 7702 // the port on the extension server that the tee calls to send non system actions
 )
 
-var PrvWithFunds, AnotherPrivWithFunds *ecdsa.PrivateKey
+var PrvWithFunds *ecdsa.PrivateKey
 
 func init() {
 	var err error
 	PrvWithFunds, err = crypto.HexToECDSA("804b01a8c27a65cc694a867be76edae3ccce7a7161cda1f67a8349df696d2207")
 	if err != nil {
 		panic("cannot read privateKey with funds")
-	}
-	AnotherPrivWithFunds, err = crypto.HexToECDSA("a6e1741818d41de64c15e04ba0820a9714c254e69790e52324c240d02576d5e5")
-	if err != nil {
-		panic("cannot read another privateKey with funds")
 	}
 }
 

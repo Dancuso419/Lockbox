@@ -10,6 +10,8 @@
 
 ARG TEE_PROXY_VERSION=v0.0.18
 
+# NOTE: not pinned by digest (unlike the main Dockerfile) — this is a dev convenience build.
+# For full reproducibility, pin by digest: golang:1.25.1-alpine@sha256:...
 FROM golang:1.25.1-alpine AS builder
 
 RUN apk add --no-cache git
@@ -24,7 +26,7 @@ RUN go mod download
 RUN CGO_ENABLED=0 GOOS=linux go build -a -o main ./cmd/proxy
 
 # Final stage
-FROM alpine:latest
+FROM alpine:3.21
 
 WORKDIR /app
 

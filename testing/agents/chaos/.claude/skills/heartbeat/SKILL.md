@@ -18,7 +18,7 @@ This ensures a clean slate for each cycle.
 ## Step 2: Acquire the lock
 
 ```bash
-echo "chaos|$(date +%s)" > /tmp/flare-extension-testing.lock
+(set -o noclobber; echo "chaos|$(date +%s)" > /tmp/flare-extension-testing.lock) 2>/dev/null || { echo "Lock held by another agent, skipping"; exit 0; }
 ```
 
 ## Step 3: Pick a scenario
@@ -27,7 +27,7 @@ Read `../../shared/scenarios/chaos-scenarios.md`. Pick the next scenario you hav
 
 You can also **invent a new scenario** — look at:
 - Previous results for patterns of failure
-- The edge case docs at `worktree/extension-examples/orderbook/notes/`
+- The edge case docs at `worktree/extension-examples/extension-scaffold/notes/`
 - Combinations of failures not yet tried
 
 ## Step 4: Run the scenario
@@ -35,7 +35,7 @@ You can also **invent a new scenario** — look at:
 Use `/run-scenario` with the scenario name or description.
 
 For code modification scenarios:
-1. Make changes in `worktree/extension-examples/orderbook/`
+1. Make changes in `worktree/extension-examples/extension-scaffold/`
 2. Run scripts from that directory
 3. Before teardown, capture `cd worktree && git diff` for the result log
 
@@ -48,7 +48,7 @@ Update `../../summary/latest-status.md`. If anything interesting happened, appen
 ## Step 6: Tear down and release
 
 ```bash
-cd worktree/extension-examples/orderbook && docker compose down 2>/dev/null || true
+cd worktree/extension-examples/extension-scaffold && docker compose down 2>/dev/null || true
 # Only release the lock if we still own it
 LOCK_OWNER=$(cut -d'|' -f1 /tmp/flare-extension-testing.lock 2>/dev/null || echo "")
 [ "$LOCK_OWNER" = "chaos" ] && rm -f /tmp/flare-extension-testing.lock

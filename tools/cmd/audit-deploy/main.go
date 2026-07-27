@@ -10,13 +10,13 @@ package main
 import (
 	"bytes"
 	"context"
-	stderrors "errors"
 	"flag"
 	"fmt"
 	"math/big"
 	"os"
 	"strings"
 
+	"extension-scaffold/tools/pkg/fccutils"
 	"extension-scaffold/tools/pkg/support"
 
 	"github.com/ethereum/go-ethereum"
@@ -24,7 +24,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi/bind"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/ethereum/go-ethereum/rpc"
 	"github.com/flare-foundation/go-flare-common/pkg/contracts/tee/extensionmanager"
 	"github.com/flare-foundation/go-flare-common/pkg/contracts/tee/machinemanager"
 	"github.com/flare-foundation/go-flare-common/pkg/contracts/tee/verification"
@@ -148,7 +147,7 @@ func replayAddTeeVersion(cc *ethclient.Client, to, from common.Address, extID *b
 		fmt.Printf("  load ABI: %v\n", err)
 		return
 	}
-	versionBytes, verr := stringToBytes32(version)
+	versionBytes, verr := fccutils.StringToBytes32(version)
 	if verr != nil {
 		fmt.Printf("  version: %v\n", verr)
 		return
@@ -164,7 +163,7 @@ func replayAddTeeVersion(cc *ethclient.Client, to, from common.Address, extID *b
 		fmt.Println("  eth_call succeeded — tx-time-only revert (gas/state race?)")
 		return
 	}
-	revertData := extractRevertData(callErr)
+	revertData := fccutils.ExtractRevertData(callErr)
 	if len(revertData) < 4 {
 		fmt.Printf("  no/short revert data: %v\n", callErr)
 		return
@@ -202,33 +201,6 @@ func replayAddTeeVersion(cc *ethclient.Client, to, from common.Address, extID *b
 		}
 	}
 	fmt.Printf("  revert with unknown selector 0x%x (full: 0x%x)\n", selector, revertData)
-}
-
-func extractRevertData(err error) []byte {
-	if err == nil {
-		return nil
-	}
-	var dataErr rpc.DataError
-	if stderrors.As(err, &dataErr) {
-		switch d := dataErr.ErrorData().(type) {
-		case string:
-			return common.FromHex(d)
-		case []byte:
-			return d
-		}
-	}
-	return nil
-}
-
-// stringToBytes32 packs an ASCII string into a bytes32, left-aligned and
-// zero-padded on the right (inverse of bytes32ToString).
-func stringToBytes32(s string) ([32]byte, error) {
-	var b [32]byte
-	if len(s) > 32 {
-		return b, fmt.Errorf("value %q exceeds 32 bytes", s)
-	}
-	copy(b[:], s)
-	return b, nil
 }
 
 func bytes32ToString(b [32]byte) string {

@@ -1,4 +1,5 @@
 #\!/bin/bash
+set -euo pipefail
 # PostToolUse hook — logs all tool invocations to results/audit.log
 # Reads tool result JSON from stdin
 

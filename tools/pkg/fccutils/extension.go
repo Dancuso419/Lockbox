@@ -15,8 +15,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-var DefaultExtensionId = big.NewInt(0)
-
 func SetupExtension(
 	s *support.Support,
 	governanceHash common.Hash,

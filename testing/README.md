@@ -82,7 +82,7 @@ ngrok config add-authtoken <your-token>
 
 ```bash
 git clone <repo-url> tee
-cd tee/extension-examples/orderbook
+cd tee/extension-examples/extension-scaffold
 
 # Configure .env
 cp .env.example .env

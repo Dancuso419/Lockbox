@@ -10,10 +10,10 @@ Unlike the other agents, **you can modify source code** in your git worktree. Yo
 - **Your worktree (modifiable repo):** `testing/agents/chaos/worktree/`
 - **The main repo root (read-only for you):** `../../..`
 
-When running deployment scripts, run them from `worktree/extension-examples/orderbook/`:
+When running deployment scripts, run them from `worktree/extension-examples/extension-scaffold/`:
 ```bash
 WORKTREE_ROOT="$(pwd)/worktree"
-ORDERBOOK_ROOT="$WORKTREE_ROOT/extension-examples/orderbook"
+SCAFFOLD_ROOT="$WORKTREE_ROOT/extension-examples/extension-scaffold"
 ```
 
 ## Lock Protocol

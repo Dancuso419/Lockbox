@@ -389,9 +389,9 @@ func ToProduction(s *support.Support, toProductionProof *machinemanager.ITeeAvai
 	return nil
 }
 
-// stringToBytes32 packs an ASCII string into a bytes32, left-aligned and
+// StringToBytes32 packs an ASCII string into a bytes32, left-aligned and
 // zero-padded on the right. Errors if the string exceeds 32 bytes.
-func stringToBytes32(s string) ([32]byte, error) {
+func StringToBytes32(s string) ([32]byte, error) {
 	var b [32]byte
 	if len(s) > 32 {
 		return b, errors.Errorf("version %q exceeds 32 bytes", s)
@@ -406,7 +406,7 @@ func AddTeeVersion(s *support.Support, privKey *ecdsa.PrivateKey, extensionId *b
 		return errors.Errorf("%s", err)
 	}
 
-	versionBytes, err := stringToBytes32(version)
+	versionBytes, err := StringToBytes32(version)
 	if err != nil {
 		return err
 	}

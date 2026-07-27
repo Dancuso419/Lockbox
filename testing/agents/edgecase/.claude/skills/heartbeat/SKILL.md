@@ -10,7 +10,7 @@ You are performing an edge case test cycle dispatched by the sequencer.
 ## Step 1: Acquire the lock
 
 ```bash
-echo "edgecase|$(date +%s)" > /tmp/flare-extension-testing.lock
+(set -o noclobber; echo "edgecase|$(date +%s)" > /tmp/flare-extension-testing.lock) 2>/dev/null || { echo "Lock held by another agent, skipping"; exit 0; }
 ```
 
 ## Step 2: Pick the next scenario

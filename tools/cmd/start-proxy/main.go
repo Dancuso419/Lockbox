@@ -21,10 +21,8 @@ import (
 )
 
 func main() {
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
-
-	ctx := context.TODO()
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 
 	loadEnv()
 
@@ -38,8 +36,8 @@ func main() {
 		logger.Warnf("Failed to log proxy and tee IDs: %v", err)
 	}
 
-	sig := <-signalChan
-	logger.Infof("Received %v signal, shutting down", sig)
+	<-ctx.Done()
+	logger.Infof("Received shutdown signal, shutting down")
 }
 
 func projectRoot() string {
