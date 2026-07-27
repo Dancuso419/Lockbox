@@ -31,7 +31,17 @@ From the extension name (example: `Orderbook`):
 | Old contract name | Always `HelloWorldInstructionSender` | `HelloWorldInstructionSender` |
 | Old Go package | Always `helloworld` | `helloworld` |
 
-Read `tools/go.mod` line 1 to get the module name — do NOT hardcode it. The module name varies depending on whether this is the scaffold (`extension-scaffold/tools`) or a copy created by `create-extension.sh`.
+Read `tools/go.mod` line 1 to get the module name — do NOT hardcode it. The module name varies depending on whether this is the scaffold (`extension-scaffold/tools`) or a copy.
+
+**Rename in every language implementation present**, not just the active one. Enumerate them with `ls -d */language.env | cut -d/ -f1`. Beyond the Solidity and bindings renames below, that means:
+
+| Language | Also rename |
+|---|---|
+| `go` | `module` line in `go/go.mod`, and every `extension-scaffold/...` import path across `go/` |
+| `python` | package docstrings in `python/app/`; no module identifier to change |
+| `typescript` | the `name` field in `typescript/package.json`, then re-run `npm install --package-lock-only` and commit the lockfile |
+
+Op-type strings (`GREETING`, `SAY_HELLO`, `SAY_GOODBYE`) are **not** part of renaming — they are the extension's operations, changed by `/create-extension`. Renaming them here without updating Solidity and the conformance fixtures in lockstep will break dispatch.
 
 ## Steps to Execute
 
@@ -113,6 +123,17 @@ After all steps, run from the scaffold root:
 ```bash
 cd tools && go build ./...
 ```
+
+Then confirm every language implementation still builds and behaves identically:
+```bash
+./scripts/test-unit.sh --all
+```
+
+```bash
+./scripts/test-conformance.sh --all
+```
+
+Renaming should not change behaviour, so conformance must still pass unchanged. If it does not, the rename touched an op-type string or a response shape — revert that part.
 
 If this succeeds, all imports and type references are correct. Report the result to the user.
 

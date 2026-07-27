@@ -2,6 +2,10 @@
 
 This guide explains how the extension scaffold works and how to implement your own logic.
 
+> **This guide's code examples are Go.** The scaffold also ships Python (`python/`) and TypeScript (`typescript/`) implementations of the same extension, selected with `LANGUAGE` in `.env`. The architecture, data flow, op-type matching and 4-step handler pattern described here are identical in all three — only the syntax differs. Where this guide says `go/internal/config/config.go`, the equivalents are `python/app/config.py` and `typescript/src/app/config.ts`; for `go/internal/extension/extension.go`, they are `python/app/handlers.py` and `typescript/src/app/handlers.ts`.
+>
+> For the language-independent specification of the HTTP surface, wire format and container requirements — including what to implement if you are adding a fourth language — see [extension-contract.md](extension-contract.md).
+
 ## How an Extension Works
 
 An extension is an HTTP server that runs inside a Trusted Execution Environment (TEE). It receives instructions from the blockchain, processes them, and returns results. The full lifecycle:
@@ -47,7 +51,7 @@ Your extension controls steps 1 (the contract) and 6 (the action handler). Every
 
 ## The Files You Modify
 
-### 1. `internal/config/config.go` — Operation Type Constants
+### 1. `go/internal/config/config.go` — Operation Type Constants
 
 This file defines the string constants for your operation types. Each constant is hashed to `bytes32` at runtime using `teeutils.ToHash()` and compared against the `OPType` field in incoming actions.
 
@@ -69,7 +73,7 @@ bytes32 constant OP_COMMAND_SAY_HELLO  = bytes32("SAY_HELLO");
 bytes32 constant OP_COMMAND_SAY_GOODBYE = bytes32("SAY_GOODBYE");
 ```
 
-### 2. `pkg/types/types.go` — Request and Response Types
+### 2. `go/pkg/types/types.go` — Request and Response Types
 
 This file defines the JSON structures for your extension's inputs and outputs.
 
@@ -113,7 +117,7 @@ type State struct {
 }
 ```
 
-### 3. `internal/extension/extension.go` — Action Handlers
+### 3. `go/internal/extension/extension.go` — Action Handlers
 
 This is the main file. It contains:
 
@@ -329,9 +333,9 @@ The sign port is available at `localhost:{SIGN_PORT}` from within the extension.
 
 ## Step-by-Step: Adding a New Operation
 
-1. **Add constants** in `internal/config/config.go` — one `OPType` constant for the operation group and one `OPCommand` constant per individual command
-2. **Define request/response types** in `pkg/types/types.go` — one request/response pair per command, plus any new fields in `State`
-3. **Add a case** in `processAction()` in `internal/extension/extension.go` — route on `OPType` to a sub-router function (e.g. `processGreeting`)
+1. **Add constants** in `go/internal/config/config.go` — one `OPType` constant for the operation group and one `OPCommand` constant per individual command
+2. **Define request/response types** in `go/pkg/types/types.go` — one request/response pair per command, plus any new fields in `State`
+3. **Add a case** in `processAction()` in `go/internal/extension/extension.go` — route on `OPType` to a sub-router function (e.g. `processGreeting`)
 4. **Write the sub-router** — switch on `OPCommand` and dispatch to individual handler functions
 5. **Write each handler function** following the 4-step pattern (decode → validate → execute → build response). Use `structs.DecodeTo` for ABI-encoded messages or `json.Decoder` for JSON messages
 6. **Add any new state fields** to the `Extension` struct and expose them in `stateHandler()` via `types.State`

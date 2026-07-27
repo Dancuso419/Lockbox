@@ -95,7 +95,7 @@ The scaffold's test sends instructions via `SendSayHello` and `SendSayGoodbye` a
 
 ### 1. Define your message and response types
 
-The scaffold defines `SayHelloResponse` and `SayGoodbyeResponse` at the top of the test file, mirroring the types from `pkg/types/types.go`:
+The scaffold defines `SayHelloResponse` and `SayGoodbyeResponse` at the top of the test file, mirroring the types from `go/pkg/types/types.go`:
 
 ```go
 type SayHelloResponse struct {
@@ -230,5 +230,5 @@ The test sends instructions through the contract functions (`sendSayHello`, `sen
 | Message payloads | Create the JSON your contract function expects | `main()` in `run-test/main.go` |
 | Send instructions | Call your contract's specific function(s) (e.g. `SendSayHello`, `SendSayGoodbye`) | `main()` in `run-test/main.go` |
 | Validate responses | Unmarshal `Data` and assert your fields | `verifyHelloResult()` / `verifyGoodbyeResult()` in `run-test/main.go` |
-| Op type + command routing | Match `OPTypeGreeting` + `OPCommandSayHello` / `OPCommandSayGoodbye` | `internal/config/config.go` and `processAction` |
+| Op type + command routing | Match `OPTypeGreeting` + `OPCommandSayHello` / `OPCommandSayGoodbye` | `go/internal/config/config.go` and `processAction` |
 | Add test scenarios | Add more send+verify pairs for each op command | `main()` in `run-test/main.go` |
