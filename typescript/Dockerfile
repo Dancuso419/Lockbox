@@ -75,6 +75,10 @@ COPY --chmod=644 --chown=0:0 --from=ext-builder /ext/package.json /app/extension
 RUN if [ "${SOURCE_DATE_EPOCH:-0}" -gt 0 ] 2>/dev/null; then find /app -exec touch -h -d @${SOURCE_DATE_EPOCH} {} +; fi
 
 # Ports and mode match go/Dockerfile so compose works uniformly across languages.
+#
+# MODE=1 is SIMULATED attestation (local dev); MODE=0 is production attestation.
+# For a real Confidential Space deploy this MUST be 0 — FTDC rejects simulated
+# attestation. See docs/deployment-steps.md §5.
 ENV MODE=1 CONFIG_PORT=5501 SIGN_PORT=7701 EXTENSION_PORT=7702
 
 # Match tee-node: the TEE workload itself is the isolation boundary.

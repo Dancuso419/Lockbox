@@ -94,11 +94,25 @@ cat config/extension.env
 
 ## 5. Build the Docker image
 
-Confirm `MODE=0` is the default in your extension's `Dockerfile` (`MODE=0` is the production attestation backend; `MODE=1` produces simulated attestation that FTDC rejects):
+The image built is selected by `LANGUAGE` in `.env` — `go/Dockerfile`, `python/Dockerfile` or `typescript/Dockerfile`. The steps below are identical for all of them.
 
-```dockerfile
-ENV MODE=0 CONFIG_PORT=5501 SIGN_PORT=7701 EXTENSION_PORT=7702
-```
+### Attestation mode
+
+`MODE` selects the attestation backend:
+
+| Value | Meaning | Used for |
+|---|---|---|
+| `1` | Simulated attestation (test code hash) | local devnet — **the scaffold's default** |
+| `0` | Production attestation | a real Confidential Space VM |
+
+**Every language's Dockerfile deliberately ships `MODE=1`**, so a bare `docker run` and the compose stack both work against the local devnet without extra configuration. `docker-compose.yaml` reinforces this with `MODE=${MODE:-1}`.
+
+**FTDC rejects simulated attestation**, so a production deploy must run with `MODE=0`. You have two options, and the second is preferred:
+
+1. Edit `ENV MODE=1` → `ENV MODE=0` in your `<LANGUAGE>/Dockerfile` before building the release image.
+2. **Leave the image as-is and override at workload launch.** The `tee.launch_policy.allow_env_override` label lists `MODE`, so the Confidential Space VM accepts an override — and without that label it would reject one. This keeps a single image usable for both local dev and production, and keeps the code hash independent of which environment it is destined for.
+
+Whichever you choose, verify what actually ended up in the image before registering its hash on-chain — see the check at the end of this section.
 
 Then build:
 
@@ -109,13 +123,31 @@ docker tag <your-extension>-extension-tee:latest <your-extension>:v0.1.0
 docker save <your-extension>:v0.1.0 -o <your-extension>-v0.1.0.tar
 ```
 
-Setting `SOURCE_DATE_EPOCH` makes the build reproducible (same source → same `codeHash`).
+Compose resolves the Dockerfile from `EXTENSION_DOCKERFILE`, which `start-services.sh` derives from `LANGUAGE`. Building compose directly (as above) uses the `go/Dockerfile` default, so for another language export it first:
 
-Verify `MODE=0` is baked into the image:
+```bash
+export EXTENSION_DOCKERFILE=python/Dockerfile TEE_NODE_REF=$(bash -c 'source scripts/lib/versions.sh; load_versions "$PWD"; echo $TEE_NODE_REF')
+```
+
+Non-Go images also need the shared tee-node base image, which `start-services.sh` builds automatically:
+
+```bash
+./scripts/build-node-base.sh
+```
+
+Setting `SOURCE_DATE_EPOCH` makes the build reproducible (same source → same `codeHash`). Note that only the Go image is reproducible **across machines**; Python and TypeScript are same-machine only — see [REPRODUCIBILITY.md](../REPRODUCIBILITY.md) before promising an auditor they can reproduce your hash.
+
+Check which mode is baked into the image:
 
 ```powershell
 docker inspect <your-extension>:v0.1.0 --format '{{range .Config.Env}}{{println .}}{{end}}' | Select-String MODE
-# expected: MODE=0
+```
+
+If you took option 1 above, expect `MODE=0`. If you took option 2, expect the scaffold default `MODE=1` and supply `MODE=0` at workload launch instead — confirm the launch policy label permits it:
+
+```powershell
+docker inspect <your-extension>:v0.1.0 --format '{{index .Config.Labels "tee.launch_policy.allow_env_override"}}'
+# MODE must appear in this list, or the VM rejects the override at attestation time
 ```
 
 ## 6. Deploy the image on a Confidential Space VM

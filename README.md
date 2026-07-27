@@ -14,7 +14,9 @@ LANGUAGE=typescript  # ~472MB. Same-machine reproducible
 
 All three implement identical behaviour and are verified against the same golden wire fixtures by `./scripts/test-conformance.sh`. The Go path is the most thoroughly reproducible because it produces a static binary on a distroless base; Python wheels and `node_modules` trees embed build-host variance (see [REPRODUCIBILITY.md](REPRODUCIBILITY.md)).
 
-Language selection is **convention-based**: `LANGUAGE=<dir>` is valid iff `<dir>/language.env` exists. Adding a fourth language requires no changes to any script — see [docs/extension-contract.md](docs/extension-contract.md).
+Language selection is **convention-based**: `LANGUAGE=<dir>` is valid iff `<dir>/language.env` exists, so adding a fourth language requires no changes to any script, tool or compose file — you create one directory.
+
+> **→ [Working in Multiple Languages](docs/languages.md)** covers choosing between them, the same handler written three ways, and a step-by-step for adding your own. The normative spec an implementation must satisfy is [docs/extension-contract.md](docs/extension-contract.md).
 
 ## Repository Structure
 
@@ -503,7 +505,19 @@ docker compose -f docker-compose.yaml -f docker-compose.coston2.yaml down
 
 ## Further Reading
 
+**Building your extension**
+
 - [Extension Development Guide](docs/extension-guide.md) — how the code works and how to add your own logic
+- [Working in Multiple Languages](docs/languages.md) — choosing a language, working in each, and **adding your own**
 - [Making It Your Own](docs/manual-setup.md) — renaming from HelloWorld to your own extension
-- [Testing Guide](docs/testing.md) — writing and running tests for your extension
 - [InstructionSender Contract](docs/instruction-sender.md) — how the on-chain contract works and how to customize it
+
+**Reference**
+
+- [Extension Container Contract](docs/extension-contract.md) — the normative wire format and container spec every implementation must satisfy
+- [Testing Guide](docs/testing.md) — the test layers, conformance fixtures, and what to run when
+- [Reproducibility](REPRODUCIBILITY.md) — what each language's build actually guarantees
+
+**Per-language**
+
+- [go/README.md](go/README.md) · [python/README.md](python/README.md) · [typescript/README.md](typescript/README.md)
