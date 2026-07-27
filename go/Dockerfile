@@ -21,30 +21,38 @@ WORKDIR /build
 RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt,sharing=locked \
-  : "${SOURCE_DATE_EPOCH:=$(stat --format=%Y /etc/apt/sources.list.d/debian.sources)}" && \
-  snapshot="$(/bin/bash -euc "printf \"%(%Y%m%dT%H%M%SZ)T\n\" \"${SOURCE_DATE_EPOCH}\"")" && \
-  : "Enabling snapshot" && \
-  sed -i -e '/Types: deb/ a\Snapshot: true' /etc/apt/sources.list.d/debian.sources && \
-  : "Enabling cache" && \
-  rm -f /etc/apt/apt.conf.d/docker-clean && \
-  echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' >/etc/apt/apt.conf.d/keep-cache && \
-  : "Fetching the snapshot and installing ca-certificates in one command" && \
-  apt-get install --update --snapshot "${snapshot}" -o Acquire::Check-Valid-Until=false -o Acquire::https::Verify-Peer=false -y ca-certificates && \
-  : "Installing ca-certificates" && \
-  apt-get install --snapshot "${snapshot}" -y ca-certificates && \
-  : "Clean up for improving reproducibility (optional)" && \
-  rm -rf /var/log/* /var/cache/ldconfig/aux-cache
+  if [ "${SOURCE_DATE_EPOCH:-0}" -gt 0 ] 2>/dev/null; then \
+    : "${SOURCE_DATE_EPOCH:=$(stat --format=%Y /etc/apt/sources.list.d/debian.sources)}" && \
+    snapshot="$(/bin/bash -euc "printf \"%(%Y%m%dT%H%M%SZ)T\n\" \"${SOURCE_DATE_EPOCH}\"")" && \
+    : "Enabling snapshot" && \
+    sed -i -e '/Types: deb/ a\Snapshot: true' /etc/apt/sources.list.d/debian.sources && \
+    : "Enabling cache" && \
+    rm -f /etc/apt/apt.conf.d/docker-clean && \
+    echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' >/etc/apt/apt.conf.d/keep-cache && \
+    : "Fetching the snapshot and installing ca-certificates in one command" && \
+    apt-get install --update --snapshot "${snapshot}" -o Acquire::Check-Valid-Until=false -o Acquire::https::Verify-Peer=false -y ca-certificates && \
+    : "Installing ca-certificates" && \
+    apt-get install --snapshot "${snapshot}" -y ca-certificates && \
+    : "Clean up for improving reproducibility (optional)" && \
+    rm -rf /var/log/* /var/cache/ldconfig/aux-cache; \
+  else \
+    apt-get update && apt-get install -y ca-certificates && \
+    rm -rf /var/log/* /var/cache/ldconfig/aux-cache; \
+  fi
 
+# Build context is the repo root (compose builds from `.`), so module paths are
+# prefixed with go/ — the language directories are siblings under that root.
+#
 # Copy only the module manifest first so `go mod download` is cached independently of source edits.
 # tee-node and every other dependency are fetched from the network during download.
-COPY --chmod=644 --chown=0:0 go.mod go.sum ./
+COPY --chmod=644 --chown=0:0 go/go.mod go/go.sum ./
 RUN go mod download
 RUN go mod verify
 
 # Copy the module's own source packages (cmd/docker is the node entrypoint).
-COPY --chmod=644 --chown=0:0 cmd/ ./cmd/
-COPY --chmod=644 --chown=0:0 internal/ ./internal/
-COPY --chmod=644 --chown=0:0 pkg/ ./pkg/
+COPY --chmod=644 --chown=0:0 go/cmd/ ./cmd/
+COPY --chmod=644 --chown=0:0 go/internal/ ./internal/
+COPY --chmod=644 --chown=0:0 go/pkg/ ./pkg/
 
 # -trimpath strips build-host paths from the binary
 # -buildid= clears go's non-deterministic build id
@@ -57,7 +65,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GOFLAGS="-buildvcs=false" \
 # NOTE: buildkit's rewrite-timestamp only clamps mtimes down to SOURCE_DATE_EPOCH (moby/buildkit#3180)
 # files older than SOURCE_DATE_EPOCH are left at their original non-deterministic mtime
 # touch every path to SOURCE_DATE_EPOCH explicitly so timestamps are normalized in both directions
-RUN find /app -exec touch -h -d @${SOURCE_DATE_EPOCH} {} +
+RUN if [ "${SOURCE_DATE_EPOCH:-0}" -gt 0 ] 2>/dev/null; then find /app -exec touch -h -d @${SOURCE_DATE_EPOCH} {} +; fi
 
 # empty base image so nothing outside these explicit copies ends up in the final layers
 FROM gcr.io/distroless/static

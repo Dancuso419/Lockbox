@@ -41,11 +41,14 @@ func buildResult(a teetypes.Action, df *instruction.DataFixed, data []byte, stat
 		Data:          data,
 		Status:        status,
 	}
+	// Log values are part of the wire contract — see docs/extension-contract.md §4.6.
 	switch status {
 	case 0:
 		ar.Log = fmt.Sprintf("error: %v", err)
 	case 1:
 		ar.Log = "ok"
+	default:
+		ar.Log = "pending"
 	}
 	return ar
 }

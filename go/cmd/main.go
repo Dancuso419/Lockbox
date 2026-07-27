@@ -24,7 +24,9 @@ func main() {
 		<-sigChan
 		ctx, cancel := context.WithTimeout(context.Background(), config.TimeoutShutdown)
 		defer cancel()
-		_ = e.Server.Shutdown(ctx)
+		if err := e.Server.Shutdown(ctx); err != nil {
+			logger.Errorf("graceful shutdown: %v", err)
+		}
 		os.Exit(0)
 	}()
 

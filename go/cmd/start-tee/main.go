@@ -1,27 +1,38 @@
-// TEMPORARY: This command starts the extension TEE node and extension server
-// as Go processes. It will be replaced by a Docker container once the Dockerfile
-// is implemented. See EXTENSION-TEMPLATE-SPEC.md §5 for the Docker approach.
+// Command start-tee runs the tee-node and the Go extension as a single host
+// process, without Docker. It backs `./scripts/start-services.sh --local`.
+//
+// This lives in the extension module (not tools/) because it links the Go
+// extension in-process — it is a Go-path development convenience, not
+// deployment tooling. tools/ must stay independent of any one language
+// implementation so that it can deploy and test all of them; see
+// docs/extension-contract.md.
+//
+// Consequently `--local` mode is Go-only. start-services.sh rejects it for
+// other languages and points at Docker Compose instead.
 package main
 
 import (
+	"bytes"
 	"crypto/ecdsa"
+	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strings"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
-	"extension-scaffold/tools/pkg/fccutils"
-	echoserver "extension-scaffold/pkg/server"
+	extserver "extension-scaffold/pkg/server"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/flare-foundation/go-flare-common/pkg/logger"
 	teeServer "github.com/flare-foundation/tee-node/pkg/server"
+	teetypes "github.com/flare-foundation/tee-node/pkg/types"
 	"github.com/joho/godotenv"
 )
 
@@ -55,9 +66,9 @@ func main() {
 }
 
 func loadEnv() {
-	// Try project-root .env first (works even when CWD is tools/).
+	// Try project-root .env first (works even when CWD is elsewhere).
 	_, thisFile, _, _ := runtime.Caller(0)
-	rootEnv := filepath.Join(filepath.Dir(thisFile), "..", "..", "..", ".env")
+	rootEnv := filepath.Join(filepath.Dir(thisFile), "..", "..", ".env")
 	if err := godotenv.Load(rootEnv); err != nil {
 		// Fallback to CWD .env.
 		if err := godotenv.Load(); err != nil {
@@ -71,7 +82,7 @@ func runExtension() {
 	go teeServer.StartServerExtension(ExtConfigurationPort, ExtensionServerPort, ExtensionPort)
 
 	// Start extension server — fail fast if port binding fails.
-	extErrCh := echoserver.StartExtension(ExtensionPort, ExtensionServerPort)
+	extErrCh := extserver.StartExtension(ExtensionPort, ExtensionServerPort)
 
 	// Give server a moment to bind, then check for early failures.
 	time.Sleep(100 * time.Millisecond)
@@ -81,14 +92,41 @@ func runExtension() {
 	default:
 	}
 
-	logger.Infof("Starting echo extension TEE on port %d", ExtConfigurationPort)
+	logger.Infof("Starting extension TEE on port %d", ExtConfigurationPort)
 
 	time.Sleep(150 * time.Millisecond)
 
-	err := fccutils.SetProxyUrl(ExtConfigurationPort, ExtProxyInternalPort)
+	err := setProxyURL(ExtConfigurationPort, ExtProxyInternalPort)
 	if err != nil {
-		fccutils.FatalWithCause(err)
+		logger.Fatalf("Error: %v", err)
 	}
+}
+
+// setProxyURL points the freshly started node at the local extension proxy.
+// Inlined from tools/pkg/fccutils so this command carries no dependency on the
+// tools module.
+func setProxyURL(configurationPort, proxyPort int) error {
+	url := fmt.Sprintf("http://localhost:%d", proxyPort)
+	request := teetypes.ConfigureProxyURLRequest{URL: &url}
+
+	body, err := json.Marshal(request)
+	if err != nil {
+		return err
+	}
+
+	url = fmt.Sprintf("http://localhost:%d/proxy", configurationPort)
+	logger.Infof("Setting proxy url on tee: %s", url)
+	resp, err := http.Post(url, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
+	return nil
 }
 
 func setOwnerAddress() common.Address {
@@ -109,7 +147,7 @@ func setOwnerAddress() common.Address {
 			}
 			privKey, err = crypto.HexToECDSA(privKeyString)
 			if err != nil {
-				fccutils.FatalWithCause(err)
+				logger.Fatalf("Error: %v", err)
 			}
 		}
 
