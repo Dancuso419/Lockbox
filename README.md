@@ -218,19 +218,19 @@ To override defaults:
 ADDRESSES_FILE=/path/to/deployed-addresses.json CHAIN_URL=http://your-node:8545 ./scripts/pre-build.sh
 ```
 
-#### 2. Start services (Docker Compose)
+#### 2. Start services
 
 ```bash
-docker compose up -d --build
+./scripts/start-services.sh
 ```
+
+Resolves `LANGUAGE` from `.env`, builds the matching extension image (and `tee-node` base / `local/tee-proxy` when needed), then brings up Docker Compose. Prefer this over a bare `docker compose up` — raw compose defaults to `go/Dockerfile` and ignores `LANGUAGE=typescript` / `python`.
 
 > **Note:** The base compose file joins the external `docker_default` network created by the e2e infrastructure. Make sure the e2e stack is running (`docker compose up` from the `e2e/` repo) before this step, or the command will fail with a "network not found" error. If you used `full-setup.sh`, this is handled automatically.
 
-`docker compose up --build` automatically builds the **extension-tee** image from your extension source code (via the `Dockerfile` and `build:` block in `docker-compose.yaml`). This is the image you rebuild whenever you change your extension code. The `--build` flag ensures it picks up your latest changes; you can omit it on subsequent runs if you haven't changed any code.
-
 This starts three containers:
 - **redis** — queue storage for the proxy
-- **ext-proxy** — TEE proxy (pre-built image) using `config/proxy/extension_proxy.docker.toml`
+- **ext-proxy** — TEE proxy using `config/proxy/extension_proxy.docker.toml`
 - **extension-tee** — your extension: tee-node + extension server built from source
 
 The compose file reads `EXTENSION_ID` from `config/extension.env` (written by pre-build). It joins the infrastructure network (`docker_default`) so the proxy can reach `indexer-db` and `node`.
@@ -239,7 +239,7 @@ Check status or stop:
 ```bash
 docker compose ps
 docker compose logs -f extension-tee
-docker compose down
+./scripts/stop-services.sh
 ```
 
 #### 3. Post-build
@@ -298,7 +298,8 @@ The `docker-compose.yaml` uses `build.context: .` — the build is self-containe
 
 To rebuild the extension image after code changes:
 ```bash
-docker compose up -d --build
+./scripts/start-services.sh            # local
+./scripts/start-services.sh --chain coston2
 ```
 
 Environment variable overrides (set in shell or `.env`):
@@ -449,17 +450,18 @@ Copy the generated HTTPS URL (e.g., `https://abc123.ngrok-free.dev`) and set it 
 
 This deploys your `InstructionSender` contract to Coston2 and registers your extension on the `TeeExtensionRegistry`. The scripts auto-detect Coston2 addresses when `LOCAL_MODE=false`.
 
-### 5. Start services (Docker Compose)
+### 5. Start services
 
-On Coston2, use the override file that swaps in the Coston2 proxy config and chain URL:
+Use `start-services.sh` — do **not** call `docker compose` directly. The script resolves `LANGUAGE` from `.env` (so TypeScript/Python actually build), builds the `tee-node` base image and `local/tee-proxy` when needed, attaches the Coston2 compose overlay, and waits for the proxy to be ready:
 
 ```bash
-docker compose -f docker-compose.yaml -f docker-compose.coston2.yaml up -d --build
+./scripts/start-services.sh --chain coston2
 ```
 
-This does the same as the local `docker compose up` but:
+Compared to a bare `docker compose up`, this:
+- Sets `EXTENSION_DOCKERFILE` from `LANGUAGE` (raw compose defaults to `go/Dockerfile`)
 - Mounts `config/proxy/extension_proxy.coston2.docker.toml` instead of the local proxy config
-- Sets `CHAIN_URL` to the Coston2 RPC endpoint
+- Sets `CHAIN_URL` / `CHAIN_ID` for Coston2
 - Creates its own network (`extension-scaffold-coston2`) instead of joining the local e2e `docker_default` network
 
 Check status:
@@ -487,7 +489,7 @@ Sends instructions on-chain via your deployed `InstructionSender` and polls the 
 ### Stopping Coston2 services
 
 ```bash
-docker compose -f docker-compose.yaml -f docker-compose.coston2.yaml down
+./scripts/stop-services.sh --chain coston2
 ```
 
 ### Coston2 vs Local Dev — Key Differences
@@ -501,7 +503,7 @@ docker compose -f docker-compose.yaml -f docker-compose.coston2.yaml down
 | Network | Joins `docker_default` (e2e infra) | Own `extension-scaffold-coston2` network |
 | Proxy accessibility | `localhost:6674` | Public URL via ngrok |
 | Normal proxy | `localhost:6662` | `https://tee-proxy-coston2-1.flare.rocks` |
-| Docker command | `docker compose up -d --build` | `docker compose -f docker-compose.yaml -f docker-compose.coston2.yaml up -d --build` |
+| Start services | `./scripts/start-services.sh` | `./scripts/start-services.sh --chain coston2` |
 
 ## Further Reading
 
