@@ -16,12 +16,19 @@ import (
 	"github.com/pkg/errors"
 )
 
-type SayHelloResponse struct {
+// Expected response shapes for the scaffold's Hello World operations.
+//
+// These are deliberately declared here rather than imported from the extension:
+// this tool asserts on the *wire format*, and must run unchanged against every
+// language implementation (see docs/extension-contract.md). Keeping them local
+// is what lets tools/ stay independent of any one implementation.
+
+type sayHelloResponse struct {
 	Greeting       string `json:"greeting"`
 	GreetingNumber int    `json:"greetingNumber"`
 }
 
-type SayGoodbyeResponse struct {
+type sayGoodbyeResponse struct {
 	Farewell       string `json:"farewell"`
 	FarewellNumber int    `json:"farewellNumber"`
 }
@@ -116,7 +123,7 @@ func verifyHelloResult(proxyURL string, instructionId common.Hash) error {
 		return errors.New("expected response data but got none")
 	}
 
-	var resp SayHelloResponse
+	var resp sayHelloResponse
 	err = json.Unmarshal(actionResult.Data, &resp)
 	if err != nil {
 		return errors.Errorf("failed to unmarshal response: %s", err)
@@ -152,7 +159,7 @@ func verifyGoodbyeResult(proxyURL string, instructionId common.Hash) error {
 		return errors.New("expected response data but got none")
 	}
 
-	var resp SayGoodbyeResponse
+	var resp sayGoodbyeResponse
 	err = json.Unmarshal(actionResult.Data, &resp)
 	if err != nil {
 		return errors.Errorf("failed to unmarshal response: %s", err)

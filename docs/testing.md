@@ -1,16 +1,63 @@
 # Testing
 
-This project has three layers of tests:
+Tests split into two groups: those covering **your extension**, and those covering the **deployment tooling**. Cheapest first — only the last needs a chain.
+
+## Your extension
+
+| Layer | What it tests | How to run | Chain? |
+|-------|--------------|------------|--------|
+| **Unit** | Your handlers, dispatch, encoding — in your chosen language | `./scripts/test-unit.sh` | no |
+| **Conformance** | The wire contract, against golden fixtures | `./scripts/test-conformance.sh` | no |
+| **End-to-end** | Full instruction lifecycle (deploy → send → process → verify) | `./scripts/test.sh` | yes |
+
+Both script-driven layers accept a language or `--all`:
+
+```bash
+./scripts/test-unit.sh python
+```
+
+```bash
+./scripts/test-conformance.sh --all
+```
+
+They dispatch through `LANGUAGE_TEST_CMD` in each `<lang>/language.env`, so they work for any language you add without modification.
+
+### Conformance testing
+
+This is the layer that keeps multiple implementations honest, and the acceptance test for a new language.
+
+`scripts/test-conformance.sh` starts **only the extension process** — no tee-node, no proxy, no chain, no Docker — replays the 16 fixtures in `testdata/conformance/`, and diffs every response field. The response payload is compared **byte-for-byte**, because tee-node hashes it and signs the result.
+
+```bash
+./scripts/test-conformance.sh --all
+```
+
+It runs in seconds, which is what makes writing a new language port tractable: a correctness signal without a full deploy cycle.
+
+The fixtures are **order-dependent** and share one process — counters accumulate across cases and the final fixture asserts the resulting state. `index.json` fixes the order.
+
+If you change a request or response shape, regenerate rather than hand-editing:
+
+```bash
+./python/.venv/bin/python testdata/conformance/gen_fixtures.py
+```
+
+Fixtures are generated from `gen_fixtures.py` so the hex encodings are derived rather than hand-assembled. Adding a case is a code edit there.
+
+> When this suite disagrees with your implementation, check [extension-contract.md](extension-contract.md) before changing the fixture. The contract is normative; the fixtures encode it.
+
+## The deployment tooling
+
+`tools/` is a standalone Go module with no dependency on any language implementation — which is what lets one deployment and test path serve Go, Python and TypeScript alike. It has its own tests.
 
 | Layer | What it tests | How to run |
 |-------|--------------|------------|
 | **Unit tests** | Revert decoding, state file I/O, env parsing, validation, report formatting | `cd tools && go test ./...` |
 | **Integration tests** | On-chain constructor validation, revert reasons, idempotent registration, pre-flight checks | `cd tools && go test -tags integration ./integration/ -v` |
-| **End-to-end tests** | Full instruction lifecycle (deploy → send → process → verify) | `./scripts/test.sh` |
 
-## Unit Tests
+### Tooling unit tests
 
-Unit tests require no external services. They cover:
+These require no external services. They cover:
 
 - **Revert reason decoding** (`tools/pkg/fccutils/revert_test.go`) — Verifies `decodeRevertHex` and `DecodeRevertReason` correctly decode ABI-encoded `Error(string)` reverts, including all 7 revert messages from `InstructionSender.sol`. Also tests edge cases: nil errors, wrapped errors, custom error selectors, invalid hex, short data.
 - **Support revert decoding** (`tools/pkg/support/support_test.go`) — Tests `decodeRevertFromError` which extracts revert reasons from go-ethereum JSON-RPC error types.
@@ -23,7 +70,7 @@ Unit tests require no external services. They cover:
 cd tools && go test ./... -v
 ```
 
-## Integration Tests
+### Tooling integration tests
 
 Integration tests run against a live Ethereum node (Hardhat, Anvil, or Coston2). They are excluded from `go test ./...` via the `integration` build tag.
 
@@ -95,21 +142,21 @@ The scaffold's test sends instructions via `SendSayHello` and `SendSayGoodbye` a
 
 ### 1. Define your message and response types
 
-The scaffold defines `SayHelloResponse` and `SayGoodbyeResponse` at the top of the test file, mirroring the types from `pkg/types/types.go`:
+The scaffold defines `sayHelloResponse` and `sayGoodbyeResponse` at the top of the test file. They **mirror** your extension's response shapes rather than importing them — `tools/` is deliberately independent of every language implementation, which is what lets this one test run unchanged against Go, Python and TypeScript:
 
 ```go
-type SayHelloResponse struct {
+type sayHelloResponse struct {
     Greeting       string `json:"greeting"`
     GreetingNumber int    `json:"greetingNumber"`
 }
 
-type SayGoodbyeResponse struct {
+type sayGoodbyeResponse struct {
     Farewell       string `json:"farewell"`
     FarewellNumber int    `json:"farewellNumber"`
 }
 ```
 
-Replace these with structs matching your extension's response types. These are defined separately in the test file because the test tool module is independent from the main extension module.
+Replace these with structs matching your extension's response shapes.
 
 ### 2. Send your instructions
 
@@ -156,7 +203,7 @@ The generic status checks are already in `verifyHelloResult` and `verifyGoodbyeR
 
 ```go
 // verifyHelloResult
-var resp SayHelloResponse
+var resp sayHelloResponse
 err = json.Unmarshal(actionResult.Data, &resp)
 if err != nil {
     return errors.Errorf("failed to unmarshal response: %s", err)
@@ -174,7 +221,7 @@ And the SAY_GOODBYE response like this:
 
 ```go
 // verifyGoodbyeResult
-var resp SayGoodbyeResponse
+var resp sayGoodbyeResponse
 err = json.Unmarshal(actionResult.Data, &resp)
 if err != nil {
     return errors.Errorf("failed to unmarshal response: %s", err)
@@ -199,7 +246,7 @@ The scaffold shows two send+verify pairs (SAY_HELLO and SAY_GOODBYE). For a real
 - Edge cases (empty fields, boundary values)
 - Error cases (invalid payloads that should return `status == 0`)
 
-### Matching op types between Solidity and Go
+### Matching op types between Solidity and your extension
 
 Your Solidity contract defines op types and op commands as `bytes32` constants:
 
@@ -209,18 +256,27 @@ bytes32 constant OP_COMMAND_SAY_HELLO   = bytes32("SAY_HELLO");
 bytes32 constant OP_COMMAND_SAY_GOODBYE = bytes32("SAY_GOODBYE");
 ```
 
-Your Go extension's `processAction` routes on the same values:
+Your extension routes on the same values. Go matches them explicitly in `processAction`:
 
 ```go
 case dataFixed.OPType == teeutils.ToHash(config.OPTypeGreeting) &&
     dataFixed.OPCommand == teeutils.ToHash(config.OPCommandSayHello):
     return e.processSayHello(action, dataFixed)
-case dataFixed.OPType == teeutils.ToHash(config.OPTypeGreeting) &&
-    dataFixed.OPCommand == teeutils.ToHash(config.OPCommandSayGoodbye):
-    return e.processSayGoodbye(action, dataFixed)
 ```
 
-The test sends instructions through the contract functions (`sendSayHello`, `sendSayGoodbye`) which set the OPType to `GREETING` and the corresponding OPCommand, then verifies the response matches what `processSayHello` or `processSayGoodbye` returns.
+Python and TypeScript register the pair up front and let the framework dispatch:
+
+```python
+framework.handle(OP_TYPE_GREETING, OP_COMMAND_SAY_HELLO, handle_say_hello)
+```
+
+```typescript
+framework.handle(OP_TYPE_GREETING, OP_COMMAND_SAY_HELLO, handleSayHello);
+```
+
+All three compare the same bytes32 encoding — the UTF-8 string right-padded with zeros to 32 bytes. **The strings must match Solidity exactly**; a mismatch is not a compile error, it silently falls through to "unsupported op type" (HTTP 501) at runtime.
+
+The test sends instructions through the contract functions (`sendSayHello`, `sendSayGoodbye`), which set the OPType to `GREETING` and the corresponding OPCommand, then verifies the response matches whatever your handler returned. Because the test asserts on the wire format rather than on language types, it is identical for every implementation.
 
 ## What you need to change (summary)
 
@@ -230,5 +286,8 @@ The test sends instructions through the contract functions (`sendSayHello`, `sen
 | Message payloads | Create the JSON your contract function expects | `main()` in `run-test/main.go` |
 | Send instructions | Call your contract's specific function(s) (e.g. `SendSayHello`, `SendSayGoodbye`) | `main()` in `run-test/main.go` |
 | Validate responses | Unmarshal `Data` and assert your fields | `verifyHelloResult()` / `verifyGoodbyeResult()` in `run-test/main.go` |
-| Op type + command routing | Match `OPTypeGreeting` + `OPCommandSayHello` / `OPCommandSayGoodbye` | `internal/config/config.go` and `processAction` |
+| Op type + command routing | Match the constants across Solidity and your extension | `go/internal/config/config.go`, `python/app/config.py`, or `typescript/src/app/config.ts` |
 | Add test scenarios | Add more send+verify pairs for each op command | `main()` in `run-test/main.go` |
+| Conformance fixtures | Regenerate after any request/response shape change | `testdata/conformance/gen_fixtures.py` |
+
+None of the `run-test` changes are language-specific: the tool asserts on the wire format, so one set of edits covers every implementation you maintain.

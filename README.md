@@ -2,59 +2,86 @@
 
 A working Hello World example for building Flare Confidential Compute (FCC) extensions. This repository demonstrates a complete, runnable extension with on-chain contracts, deployment tooling, and registration scripts — everything you need to understand how extensions work on the Flare TEE infrastructure.
 
+**The same extension is implemented in Go, Python and TypeScript.** Pick one with `LANGUAGE` in `.env`; everything else — contracts, deployment, registration, tests — is identical regardless of choice.
+
+## Choosing a Language
+
+```bash
+LANGUAGE=go          # default. Smallest image (~22MB distroless), bit-for-bit reproducible
+LANGUAGE=python      # ~268MB. Same-machine reproducible
+LANGUAGE=typescript  # ~472MB. Same-machine reproducible
+```
+
+All three implement identical behaviour and are verified against the same golden wire fixtures by `./scripts/test-conformance.sh`. The Go path is the most thoroughly reproducible because it produces a static binary on a distroless base; Python wheels and `node_modules` trees embed build-host variance (see [REPRODUCIBILITY.md](REPRODUCIBILITY.md)).
+
+Language selection is **convention-based**: `LANGUAGE=<dir>` is valid iff `<dir>/language.env` exists, so adding a fourth language requires no changes to any script, tool or compose file — you create one directory.
+
+> **→ [Working in Multiple Languages](docs/languages.md)** covers choosing between them, the same handler written three ways, and a step-by-step for adding your own. The normative spec an implementation must satisfy is [docs/extension-contract.md](docs/extension-contract.md).
+
 ## Repository Structure
 
+The repo splits into a **language-neutral spine** (contracts, deployment tooling, scripts) and **pluggable language implementations**. You customize one language directory plus the Solidity contract.
+
 ```
-├── cmd/main.go                        # ★ Extension server entry point (standalone, for dev)
-├── internal/
-│   ├── config/config.go               # ★ OPType constants, version, port defaults
-│   └── extension/
-│       ├── extension.go              # ★ MAIN CUSTOMIZATION POINT: processAction routing
-│       └── utils.go                  # Boilerplate: actionHandler, buildResult (no changes needed)
-├── pkg/
-│   ├── decoder/                        # Decoder interface, registry, JSON & ABI decoders
-│   ├── server/
-│   │   ├── server.go                  # StartExtension() wrapper
-│   │   └── typesserver.go             # StartTypesServer() wrapper
-│   └── types/
-│       ├── types.go                   # ★ Request/response types
-│       └── register.go                # ★ Decoder registrations for types-server
-├── contracts/
-│   └── InstructionSender.sol          # ★ Your extension's on-chain entry point
+├── go/                                 # ── Go implementation
+│   ├── cmd/main.go                     # ★ Extension server entry point (standalone, for dev)
+│   ├── cmd/docker/main.go              # Combined TEE node + extension (single-process image)
+│   ├── cmd/start-tee/main.go           # Host-process runner for --local mode
+│   ├── internal/config/config.go       # ★ OPType constants, version, port defaults
+│   ├── internal/extension/extension.go # ★ MAIN CUSTOMIZATION POINT: processAction routing
+│   ├── internal/extension/utils.go     # Boilerplate: actionHandler, buildResult
+│   ├── pkg/types/types.go              # ★ Request/response types
+│   ├── Dockerfile                      # Single-process image (distroless)
+│   └── language.env                    # Language manifest (marks this dir as an implementation)
+├── python/                             # ── Python implementation
+│   ├── base/                           # Framework: server, wire types, encoding, node client
+│   ├── app/config.py                   # ★ OPType constants and version
+│   ├── app/handlers.py                 # ★ MAIN CUSTOMIZATION POINT: your handlers
+│   ├── app/abi.py                      # ★ ABI decoding for non-JSON payloads
+│   ├── tests/                          # pytest suite
+│   ├── Dockerfile                      # Two-process image (tee-node binary + python)
+│   └── language.env
+├── typescript/                         # ── TypeScript implementation
+│   ├── src/base/                       # Framework: server, wire types, encoding, node client
+│   ├── src/app/config.ts               # ★ OPType constants and version
+│   ├── src/app/handlers.ts             # ★ MAIN CUSTOMIZATION POINT: your handlers
+│   ├── src/app/abi.ts                  # ★ ABI decoding for non-JSON payloads
+│   ├── src/__tests__/                  # vitest suite
+│   ├── Dockerfile                      # Two-process image (tee-node binary + node)
+│   └── language.env
+│
+├── contracts/InstructionSender.sol     # ★ Your extension's on-chain entry point (shared)
+├── docker/node-base.Dockerfile         # Shared tee-node builder for non-Go images
+├── testdata/conformance/               # Golden wire fixtures, asserted against every language
 ├── config/
-│   ├── extension.env                  # Generated by pre-build (gitignored)
-│   └── proxy/extension_proxy.toml     # Proxy config (Redis, DB, ports, addresses)
-├── foundry.toml                       # Foundry config for compiling contracts
-├── go.mod                             # Root Go module
-├── scripts/
-│   ├── full-setup.sh                  # Chains all phases: pre-build → docker compose → post-build → test
-│   ├── pre-build.sh                   # Compile + deploy + register → writes config
-│   ├── post-build.sh                  # Allow TEE version + register TEE on-chain
-│   ├── test.sh                        # Send instructions + verify results
-│   └── generate-bindings.sh           # Compile contract → generate Go bindings
-├── cmd/
-│   ├── main.go                        # ★ Extension server entry point (standalone, for dev)
-│   ├── docker/main.go                 # Combined TEE node + extension + types-server for Docker
-│   └── types-server/main.go           # Standalone types-server entry point
-├── Dockerfile                          # Builds the extension-tee image
-├── docker-compose.yaml                # Redis + proxy + extension-tee
-├── .env.example                        # Sample env vars for docker compose
-└── tools/
-    ├── go.mod
-    ├── cmd/
-    │   ├── deploy-contract/main.go    # Deploys InstructionSender to chain
-    │   ├── register-extension/main.go # Registers extension on TeeExtensionRegistry
-    │   ├── allow-tee-version/main.go  # Registers TEE code hash as allowed version
-    │   ├── register-tee/main.go       # Registers extension TEE machine on-chain
-    │   └── run-test/main.go           # Sends instructions and verifies results
-    └── pkg/
-        ├── utils/instructions.go      # Deploy, SetExtensionId, SendSayHello, SendSayGoodbye helpers
-        └── contracts/helloworld/
-            ├── helloworld.go          # go:generate directive for abigen
-            └── autogen.go             # Generated by generate-bindings.sh (gitignored)
+│   ├── extension.env                   # Generated by pre-build (gitignored)
+│   └── proxy/extension_proxy.toml      # Proxy config (Redis, DB, ports, addresses)
+├── scripts/                            # ── Language-neutral
+│   ├── full-setup.sh                   # Chains all phases: pre-build → compose → post-build → test
+│   ├── pre-build.sh                    # Compile + deploy + register → writes config
+│   ├── post-build.sh                   # Allow TEE version + register TEE on-chain
+│   ├── test.sh                         # On-chain end-to-end test (identical for all languages)
+│   ├── test-unit.sh                    # Unit tests, dispatched via language.env
+│   ├── test-conformance.sh             # Wire-contract conformance, no chain required
+│   ├── check-versions.sh               # Fails when dependency pins drift apart
+│   ├── build-node-base.sh              # Builds the shared tee-node base image
+│   ├── generate-bindings.sh            # Compile contract → generate Go bindings
+│   └── lib/{language,versions}.sh      # Language resolution + version derivation
+├── tools/                              # ── Language-neutral deployment tooling (Go)
+│   ├── cmd/deploy-contract/            # Deploys InstructionSender to chain
+│   ├── cmd/register-extension/         # Registers extension on TeeExtensionRegistry
+│   ├── cmd/allow-tee-version/          # Registers TEE code hash as allowed version
+│   ├── cmd/register-tee/               # Registers extension TEE machine on-chain
+│   ├── cmd/run-test/                   # Sends instructions and verifies results
+│   └── pkg/utils/instructions.go       # Deploy, SetExtensionId, SendSayHello helpers
+├── docker-compose.yaml                 # Redis + proxy + extension-tee
+├── foundry.toml                        # Foundry config for compiling contracts
+└── .env.example                        # Sample env vars, including LANGUAGE
 
 ★ = Files developers MUST modify for their extension
 ```
+
+`tools/` is deliberately independent of every language implementation, which is what lets one deployment and test path serve all of them.
 
 ## Environment Variables
 
@@ -68,7 +95,6 @@ A working Hello World example for building Flare Confidential Compute (FCC) exte
 | `INITIAL_OWNER` | derived from `DEPLOYMENT_PRIVATE_KEY` | Initial contract owner address |
 | `EXT_PROXY_URL` | `http://localhost:6674` | Extension proxy URL (post-build, test) |
 | `NORMAL_PROXY_URL` | `http://localhost:6662` | Normal/FTDC proxy URL (post-build) |
-| `TYPES_SERVER_PORT` | `8100` | Types server HTTP port |
 | `EXTENSION_OWNER_KEY` | (empty, falls back to `DEPLOYMENT_PRIVATE_KEY`) | Private key override for AddTeeVersion |
 | `TEE_VERSION` | `v0.1.0` | Version string for TEE registration |
 | `GOVERNANCE_SIGNERS` | `INITIAL_OWNER` (deployer) | Comma-separated 0x addresses that govern this extension's TEE machines |
@@ -102,46 +128,56 @@ same values are passed to the node container via Docker Compose.
 
 ## Prerequisites
 
-- **Go 1.25.1+**
+Always required:
+
 - **Foundry** (`forge`) — compiles the Solidity contract
-- **jq** — extracts ABI/bytecode from Foundry output
+- **jq** — extracts ABI/bytecode from Foundry output, and drives the conformance harness
+- **Go 1.25.1+** — the deployment tooling in `tools/` is Go regardless of your extension language
+- **Docker** — builds and runs the extension image
 - **Running local infrastructure** — Hardhat node with deployed Flare contracts (via `docker compose up` from the `e2e/` repo)
+
+Additionally, for your chosen `LANGUAGE`:
+
+| Language | Also needs |
+|---|---|
+| `go` | nothing beyond the above |
+| `python` | Python 3.11+ (a venv is created automatically) |
+| `typescript` | Node 22+ and npm |
 
 ## Creating Your Extension
 
-The scaffold ships with placeholder code marked with `TODO` comments. To build your extension, you modify 5 files:
+The scaffold ships with a working Hello World. To build your extension you modify four things: the operation constants, the handlers, the Solidity contract, and the test assertions.
 
 | # | File | What you do |
 |---|------|-------------|
-| 1 | `internal/config/config.go` | Define your OPType and OPCommand constants (e.g. `OPTypeGreeting = "GREETING"`, `OPCommandSayHello = "SAY_HELLO"`) |
-| 2 | `pkg/types/types.go` | Define your request, response, and state structs |
-| 3 | `internal/extension/extension.go` | Add routing cases and implement your action handlers |
-| 4 | `pkg/types/register.go` | Register decoders for your request/response types ([details](docs/types-server.md#adding-your-own-types)) |
-| 5 | `contracts/InstructionSender.sol` | Add matching `bytes32` constants and send functions |
-| 6 | `tools/cmd/run-test/main.go` | Write test payloads and response assertions |
+| 1 | `<lang>` config — `go/internal/config/config.go`, `python/app/config.py`, or `typescript/src/app/config.ts` | Define your OPType and OPCommand constants |
+| 2 | `<lang>` handlers — `go/internal/extension/extension.go`, `python/app/handlers.py`, or `typescript/src/app/handlers.ts` | Implement your action handlers and state |
+| 3 | `contracts/InstructionSender.sol` | Add matching `bytes32` constants and send functions |
+| 4 | `tools/cmd/run-test/main.go` | Write test payloads and response assertions |
 
-The key link between your Solidity contract and Go code is the **OPType** and **OPCommand** pair — both must match across all three layers:
+Go additionally has `go/pkg/types/types.go` for request/response structs; Python and TypeScript declare those shapes inline in the handlers.
+
+The key link between your Solidity contract and your handlers is the **OPType** and **OPCommand** pair, which must match exactly across every layer:
 
 ```
-Solidity:  bytes32 constant OP_TYPE_GREETING     = bytes32("GREETING");
-           bytes32 constant OP_COMMAND_SAY_HELLO  = bytes32("SAY_HELLO");
-           bytes32 constant OP_COMMAND_SAY_GOODBYE = bytes32("SAY_GOODBYE");
+Solidity:    bytes32 constant OP_TYPE_GREETING      = bytes32("GREETING");
+             bytes32 constant OP_COMMAND_SAY_HELLO  = bytes32("SAY_HELLO");
 
-Go config: OPTypeGreeting      = "GREETING"
-           OPCommandSayHello   = "SAY_HELLO"
-           OPCommandSayGoodbye = "SAY_GOODBYE"
+Go:          OPTypeGreeting    = "GREETING"        // internal/config/config.go
+             OPCommandSayHello = "SAY_HELLO"
 
-Go router: case dataFixed.OPType == teeutils.ToHash(config.OPTypeGreeting):
-               // sub-route on OPCommand
-               case dataFixed.OPCommand == teeutils.ToHash(config.OPCommandSayHello):
-               case dataFixed.OPCommand == teeutils.ToHash(config.OPCommandSayGoodbye):
+Python:      OP_TYPE_GREETING     = "GREETING"     # app/config.py
+             OP_COMMAND_SAY_HELLO = "SAY_HELLO"
+
+TypeScript:  OP_TYPE_GREETING     = "GREETING"     // src/app/config.ts
+             OP_COMMAND_SAY_HELLO = "SAY_HELLO"
 ```
 
-Register.go maps each `(OPType, OPCommand)` pair to its decoder. The decoder registry no longer requires a `Kind()` method; `NewJSONDecoder[T]()` takes no arguments, and `NewABIDecoder[T](abi)` takes only the ABI string.
+A mismatch means the action falls through to "unsupported op type" (HTTP 501).
 
-Each action handler follows a 4-step pattern: decode the request, validate it, execute your logic, and return a result via `buildResult()`.
+Every handler follows the same 4-step pattern in all three languages: decode the request, validate it, execute your logic, return a result.
 
-> ### **→ [Read the Extension Development Guide](docs/extension-guide.md)** for a detailed walkthrough of each file, the data flow, and worked examples.
+> ### **→ [Read the Extension Development Guide](docs/extension-guide.md)** for a detailed walkthrough, and **[docs/extension-contract.md](docs/extension-contract.md)** for the normative wire and container contract.
 
 ## Quick Start
 
@@ -182,17 +218,19 @@ To override defaults:
 ADDRESSES_FILE=/path/to/deployed-addresses.json CHAIN_URL=http://your-node:8545 ./scripts/pre-build.sh
 ```
 
-#### 2. Start services (Docker Compose)
+#### 2. Start services
 
 ```bash
-docker compose up -d --build
+./scripts/start-services.sh
 ```
 
-`docker compose up --build` automatically builds the **extension-tee** image from your extension source code (via the `Dockerfile` and `build:` block in `docker-compose.yaml`). This is the image you rebuild whenever you change your extension code. The `--build` flag ensures it picks up your latest changes; you can omit it on subsequent runs if you haven't changed any code.
+Resolves `LANGUAGE` from `.env`, builds the matching extension image (and `tee-node` base / `local/tee-proxy` when needed), then brings up Docker Compose. Prefer this over a bare `docker compose up` — raw compose defaults to `go/Dockerfile` and ignores `LANGUAGE=typescript` / `python`.
+
+> **Note:** The base compose file joins the external `docker_default` network created by the e2e infrastructure. Make sure the e2e stack is running (`docker compose up` from the `e2e/` repo) before this step, or the command will fail with a "network not found" error. If you used `full-setup.sh`, this is handled automatically.
 
 This starts three containers:
 - **redis** — queue storage for the proxy
-- **ext-proxy** — TEE proxy (pre-built image) using `config/proxy/extension_proxy.docker.toml`
+- **ext-proxy** — TEE proxy using `config/proxy/extension_proxy.docker.toml`
 - **extension-tee** — your extension: tee-node + extension server built from source
 
 The compose file reads `EXTENSION_ID` from `config/extension.env` (written by pre-build). It joins the infrastructure network (`docker_default`) so the proxy can reach `indexer-db` and `node`.
@@ -201,7 +239,7 @@ Check status or stop:
 ```bash
 docker compose ps
 docker compose logs -f extension-tee
-docker compose down
+./scripts/stop-services.sh
 ```
 
 #### 3. Post-build
@@ -260,7 +298,8 @@ The `docker-compose.yaml` uses `build.context: .` — the build is self-containe
 
 To rebuild the extension image after code changes:
 ```bash
-docker compose up -d --build
+./scripts/start-services.sh            # local
+./scripts/start-services.sh --chain coston2
 ```
 
 Environment variable overrides (set in shell or `.env`):
@@ -272,7 +311,7 @@ REGISTRY=registry.gitlab.com/flarenetwork/tee/e2e docker compose up -d
 LOG_LEVEL=DEBUG docker compose up -d
 ```
 
-> **Building the proxy image locally:** The `tee-proxy` image is pulled automatically. If you need to build it from source instead, run `docker build -f tee-proxy/Dockerfile -t tee-proxy:latest .` from the `tee/` root.
+> **Building the proxy image locally:** The `tee-proxy` image is built automatically by `start-services.sh` if it doesn't exist. To build it manually, run `docker build -f proxy/Dockerfile -t local/tee-proxy proxy/` from the extension root.
 
 ### Ports (local dev)
 
@@ -304,19 +343,35 @@ Or run everything (pre-build + post-build + test) in one shot:
 ./scripts/full-setup.sh --test
 ```
 
-### Unit and integration tests
+### The three test layers
 
-The tooling includes unit tests (no chain required) and integration tests (run against any EVM chain):
+The scaffold tests at three levels, cheapest first. Only the last needs a chain.
+
+**1. Unit tests** — your implementation's own tests, dispatched by `LANGUAGE`:
 
 ```bash
-# Unit tests — always safe to run
-cd tools && go test ./...
-
-# Integration tests — requires a running chain node
-cd tools && go test -tags integration ./integration/ -v -count=1
+./scripts/test-unit.sh              # the language from .env
+./scripts/test-unit.sh --all        # every language
 ```
 
-See the [Testing Guide](docs/testing.md) for details on what each layer covers and how to configure the integration tests for local or Coston2.
+**2. Conformance** — replays the golden wire fixtures in `testdata/conformance/` against a running extension and diffs the responses. No chain, no proxy, no Docker; runs in seconds:
+
+```bash
+./scripts/test-conformance.sh --all
+```
+
+This is what guarantees the three implementations stay byte-identical on the wire, and it is the acceptance test for any new language. If you change a handler's output shape, regenerate the fixtures with `./python/.venv/bin/python testdata/conformance/gen_fixtures.py`.
+
+**3. On-chain end-to-end** — `./scripts/test.sh`, identical for every language.
+
+Deployment tooling has its own tests:
+
+```bash
+cd tools && go test ./...                                      # unit, no chain
+cd tools && go test -tags integration ./integration/ -v -count=1  # needs a chain node
+```
+
+See the [Testing Guide](docs/testing.md) for what each layer covers and how to configure the integration tests.
 
 ## Deploying to Coston2
 
@@ -395,17 +450,18 @@ Copy the generated HTTPS URL (e.g., `https://abc123.ngrok-free.dev`) and set it 
 
 This deploys your `InstructionSender` contract to Coston2 and registers your extension on the `TeeExtensionRegistry`. The scripts auto-detect Coston2 addresses when `LOCAL_MODE=false`.
 
-### 5. Start services (Docker Compose)
+### 5. Start services
 
-On Coston2, use the override file that swaps in the Coston2 proxy config and chain URL:
+Use `start-services.sh` — do **not** call `docker compose` directly. The script resolves `LANGUAGE` from `.env` (so TypeScript/Python actually build), builds the `tee-node` base image and `local/tee-proxy` when needed, attaches the Coston2 compose overlay, and waits for the proxy to be ready:
 
 ```bash
-docker compose -f docker-compose.yaml -f docker-compose.coston2.yaml up -d --build
+./scripts/start-services.sh --chain coston2
 ```
 
-This does the same as the local `docker compose up` but:
+Compared to a bare `docker compose up`, this:
+- Sets `EXTENSION_DOCKERFILE` from `LANGUAGE` (raw compose defaults to `go/Dockerfile`)
 - Mounts `config/proxy/extension_proxy.coston2.docker.toml` instead of the local proxy config
-- Sets `CHAIN_URL` to the Coston2 RPC endpoint
+- Sets `CHAIN_URL` / `CHAIN_ID` for Coston2
 - Creates its own network (`extension-scaffold-coston2`) instead of joining the local e2e `docker_default` network
 
 Check status:
@@ -433,7 +489,7 @@ Sends instructions on-chain via your deployed `InstructionSender` and polls the 
 ### Stopping Coston2 services
 
 ```bash
-docker compose -f docker-compose.yaml -f docker-compose.coston2.yaml down
+./scripts/stop-services.sh --chain coston2
 ```
 
 ### Coston2 vs Local Dev — Key Differences
@@ -447,12 +503,23 @@ docker compose -f docker-compose.yaml -f docker-compose.coston2.yaml down
 | Network | Joins `docker_default` (e2e infra) | Own `extension-scaffold-coston2` network |
 | Proxy accessibility | `localhost:6674` | Public URL via ngrok |
 | Normal proxy | `localhost:6662` | `https://tee-proxy-coston2-1.flare.rocks` |
-| Docker command | `docker compose up -d --build` | `docker compose -f docker-compose.yaml -f docker-compose.coston2.yaml up -d --build` |
+| Start services | `./scripts/start-services.sh` | `./scripts/start-services.sh --chain coston2` |
 
 ## Further Reading
 
+**Building your extension**
+
 - [Extension Development Guide](docs/extension-guide.md) — how the code works and how to add your own logic
-- [Types Server Guide](docs/types-server.md) — decoding instruction data, adding your own types, and the types-server API
+- [Working in Multiple Languages](docs/languages.md) — choosing a language, working in each, and **adding your own**
 - [Making It Your Own](docs/manual-setup.md) — renaming from HelloWorld to your own extension
-- [Testing Guide](docs/testing.md) — writing and running tests for your extension
 - [InstructionSender Contract](docs/instruction-sender.md) — how the on-chain contract works and how to customize it
+
+**Reference**
+
+- [Extension Container Contract](docs/extension-contract.md) — the normative wire format and container spec every implementation must satisfy
+- [Testing Guide](docs/testing.md) — the test layers, conformance fixtures, and what to run when
+- [Reproducibility](REPRODUCIBILITY.md) — what each language's build actually guarantees
+
+**Per-language**
+
+- [go/README.md](go/README.md) · [python/README.md](python/README.md) · [typescript/README.md](typescript/README.md)

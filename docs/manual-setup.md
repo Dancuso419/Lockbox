@@ -6,6 +6,8 @@ If you're using [Claude Code](https://claude.ai/code), you can run `/rename-scaf
 
 The manual steps are below, using "Orderbook" / "orderbook" as an example — substitute your own name.
 
+> **Steps 1–5 are language-neutral** — they rename the Solidity contract and the Go bindings that the deployment tooling uses, and are required no matter which `LANGUAGE` you build. Step 6 covers the per-language identifiers.
+
 ## 1. Rename the Solidity contract
 
 **File:** `contracts/InstructionSender.sol`
@@ -79,6 +81,20 @@ import "your-module/tools/pkg/contracts/orderbook"
 
 Note: The `sender.SendSayHello()` and `sender.SendSayGoodbye()` calls in `SendInstruction()` must also be renamed to match the new Solidity function names (e.g. `sendPlaceOrder` in Solidity becomes `sender.SendPlaceOrder` in the Go bindings).
 
+## 6. Rename inside your language implementation
+
+The steps above cover the shared layers. Each language implementation you maintain also carries its own identifiers:
+
+| Language | What to rename |
+|---|---|
+| `go` | The `module` line in `go/go.mod`, and every `extension-scaffold/...` import path across `go/` |
+| `python` | Package docstrings in `python/app/` — there is no module identifier to change |
+| `typescript` | The `name` field in `typescript/package.json`, then `npm install --package-lock-only` and commit the lockfile |
+
+Enumerate what is present with `ls -d */language.env | cut -d/ -f1`.
+
+**Do not rename the op-type strings** (`GREETING`, `SAY_HELLO`, `SAY_GOODBYE`) here. Those are your extension's *operations*, not its name — changing them means updating the Solidity constants, every language's config, and the conformance fixtures in lockstep. That is the job of `/create-extension`, not renaming.
+
 ## Summary checklist
 
 | # | What | File | Change |
@@ -88,3 +104,12 @@ Note: The `sender.SendSayHello()` and `sender.SendSayGoodbye()` calls in `SendIn
 | 3 | Rename Go bindings directory | `tools/pkg/contracts/helloworld/` | Rename to match `GO_PKG` |
 | 4 | Update `go:generate` directive | `tools/pkg/contracts/<yourpkg>/*.go` | `--abi`, `--bin`, `--pkg`, `--type` flags |
 | 5 | Update Go imports | `tools/pkg/utils/instructions.go` | Import path + type names + `SendSayHello`/`SendSayGoodbye` renames |
+| 6 | Rename per-language identifiers | `go/go.mod`, `typescript/package.json` | Module name / package name |
+
+Renaming should not change behaviour, so verify with:
+
+```bash
+./scripts/test-conformance.sh --all
+```
+
+If conformance now fails, the rename touched an op-type string or a response shape — revert that part.

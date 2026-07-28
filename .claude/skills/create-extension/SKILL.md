@@ -1,6 +1,6 @@
 # Create Extension
 
-Guides the developer through implementing their extension's business logic — the core "what does your extension do?" workflow.
+Guides the developer through implementing their extension's business logic — the core "what does your extension do?" workflow. Works for any implementation language.
 
 ## When to Use
 
@@ -13,209 +13,105 @@ The user wants to implement their extension logic: define operations, write hand
 
 ## Inputs
 
-The skill needs to know what **operation(s)** the extension should support. For each operation, gather:
-- **Name** (e.g., "SayHello", "Transfer", "Swap")
+The skill needs two things.
+
+**1. The implementation language.** Determine it in this order:
+1. The user said so explicitly ("add a Python handler").
+2. Read `LANGUAGE=` from `.env` at the scaffold root.
+3. If `.env` is absent or has no `LANGUAGE`, default to `go` (the scaffold default) and say so.
+
+Valid values are the directory names for which `<dir>/language.env` exists — run `ls -d */language.env | cut -d/ -f1` to enumerate. Do NOT assume the list is `go python typescript`; the scaffold is convention-based and the user may have added their own.
+
+**2. The operation(s).** For each, gather:
+- **Name** (e.g. "SayHello", "Transfer", "Swap")
 - **Description** — what it does
-- **Request fields** — what the user sends (JSON payload)
+- **Request fields** — what the caller sends
 - **Response fields** — what the extension returns
+- **Encoding** — JSON (the common case) or ABI-encoded
 
-How to determine:
-1. **User described it** — use what they said
-2. **User is vague** — ask: "What operation(s) should your extension support? For each, describe the name, what it does, and what data it takes/returns."
+If the user is vague, ask: "What operation(s) should your extension support? For each, describe the name, what it does, and what data it takes and returns."
 
-Before starting, read the current state of the files to understand what's already implemented (the scaffold may already be renamed, or some operations may exist).
+Before starting, read the current state of the files — the scaffold may already be renamed, or some operations may already exist.
 
 ## Steps to Execute
 
 All paths are relative to the scaffold root (the directory containing `foundry.toml`).
 
-### Step 1: Add OPType constant(s) in `internal/config/config.go`
+### Step 1: Language-neutral — Solidity contract
 
-Read the file first. Add one constant per operation. The scaffold ships with:
-
-```go
-const (
-    OPTypeSayHello = "SAY_HELLO"
-)
-```
-
-Use UPPER_SNAKE_CASE for the string values. These strings must exactly match the `bytes32` constants you'll add in Solidity. Replace or add to the existing constant(s) based on what the user wants.
-
-### Step 2: Define request/response/state types in `pkg/types/types.go`
-
-Read the file first. Add structs for each operation's request and response, plus update the State struct. The scaffold ships with:
-
-```go
-// Request — decoded from df.OriginalMessage
-type SayHelloRequest struct {
-    Name string `json:"name"`
-}
-
-// Response — returned in ActionResult.Data
-type SayHelloResponse struct {
-    Greeting       string `json:"greeting"`
-    GreetingNumber int    `json:"greetingNumber"`
-}
-
-// State — returned by GET /state
-type State struct {
-    GreetingCount int    `json:"greetingCount"`
-    LastGreeting  string `json:"lastGreeting"`
-}
-```
-
-Replace these with the user's types, following the same pattern.
-
-### Step 3: Add case(s) in `processAction()` router in `internal/extension/extension.go`
-
-Read the file first. Add a `case` in the `switch` block for each new operation. The scaffold has:
-
-```go
-case dataFixed.OPType == teeutils.ToHash(config.OPTypeSayHello):
-    ar := e.processSayHello(action, dataFixed)
-    b, _ := json.Marshal(ar)
-    return http.StatusOK, b
-```
-
-Replace or add cases following this pattern.
-
-### Step 4: Write handler function(s) following the 4-step pattern
-
-Each handler follows this exact pattern. The scaffold's handler:
-
-```go
-func (e *Extension) processSayHello(action teetypes.Action, df *instruction.DataFixed) teetypes.ActionResult {
-    // 1. Decode the incoming message
-    var req types.SayHelloRequest
-    dec := json.NewDecoder(bytes.NewReader(df.OriginalMessage))
-    dec.DisallowUnknownFields()
-    err := dec.Decode(&req)
-    if err != nil {
-        return buildResult(action, df, nil, 0, fmt.Errorf("decoding request: %w", err))
-    }
-
-    // 2. Validate
-    if req.Name == "" {
-        return buildResult(action, df, nil, 0, fmt.Errorf("name must not be empty"))
-    }
-
-    // 3. Execute business logic
-    e.mu.Lock()
-    e.greetingCount++
-    greetingNumber := e.greetingCount
-    greeting := fmt.Sprintf("Hello, %s! Welcome to Flare Confidential Compute.", req.Name)
-    e.lastGreeting = greeting
-    e.mu.Unlock()
-
-    // 4. Build response
-    resp := types.SayHelloResponse{
-        Greeting:       greeting,
-        GreetingNumber: greetingNumber,
-    }
-    data, _ := json.Marshal(resp)
-
-    return buildResult(action, df, data, 1, nil)
-}
-```
-
-**`buildResult` status codes:**
-- `0` = error — the `err` parameter message goes into `ActionResult.Log`
-- `1` = success — the `data` parameter is returned to the caller in `ActionResult.Data`
-
-### Step 5: Update `Extension` struct and `stateHandler()`
-
-Add state fields to the `Extension` struct and wire them into `stateHandler()` via the `types.State` struct. Always protect state access with the `mu` mutex:
-
-```go
-e.mu.Lock()
-e.greetingCount++
-e.lastGreeting = greeting
-e.mu.Unlock()
-```
-
-### Step 6: Add Solidity constant(s) and send function(s) in `contracts/InstructionSender.sol`
-
-Read the file first. The scaffold has:
+Read `contracts/InstructionSender.sol` first. Add one `bytes32` constant per operation and a matching send function. The scaffold ships:
 
 ```solidity
-bytes32 constant OP_TYPE_SAY_HELLO = bytes32("SAY_HELLO");
-
-function sendSayHello(bytes calldata _message) external payable {
-    address[] memory teeIds = TEE_MACHINE_REGISTRY.getRandomTeeIds(_getExtensionId(), 1);
-    address[] memory cosigners = new address[](0);
-    uint64 cosignersThreshold = 0;
-
-    TEE_EXTENSION_REGISTRY.sendInstructions{value: msg.value}(
-        teeIds,
-        OP_TYPE_SAY_HELLO,
-        OP_COMMAND_PLACEHOLDER,
-        _message,
-        cosigners,
-        cosignersThreshold
-    );
-}
+bytes32 public constant OP_TYPE_GREETING = bytes32("GREETING");
+bytes32 public constant OP_COMMAND_SAY_HELLO = bytes32("SAY_HELLO");
 ```
 
-The OPType string in Solidity must **exactly match** the Go constant. Replace or add constants and send functions following this pattern.
+The op-type and op-command strings must **exactly match** the constants you will add in the extension language. A mismatch means actions fall through to "unsupported op type" (HTTP 501).
 
-### Step 7: Regenerate bindings
+For a JSON payload, the send function takes `bytes calldata _message`. For an ABI-encoded payload, take typed parameters and `abi.encode(...)` them into a struct — see `sendSayGoodbye` for the pattern.
 
-Run from the scaffold root:
+### Step 2: Language-specific — constants, handlers, state
+
+**Read the reference for the target language and follow it:**
+
+| Language | Reference |
+|---|---|
+| `go` | `references/go.md` |
+| `python` | `references/python.md` |
+| `typescript` | `references/typescript.md` |
+| anything else | `references/adding-a-language.md` |
+
+Each reference covers the same four things in that language's idiom: where op constants live, how to register a handler, the 4-step handler pattern, and how to extend the reported state.
+
+### Step 3: Regenerate bindings
 
 ```bash
 ./scripts/generate-bindings.sh
 ```
 
-This compiles the Solidity contract and generates Go bindings in `tools/pkg/contracts/`.
+Compiles the Solidity contract and regenerates the Go bindings in `tools/pkg/contracts/`. Required after ANY Solidity change, in every language — the deployment tooling is Go regardless of the extension language.
 
-### Step 8: Update Go tooling in `tools/pkg/utils/instructions.go`
+### Step 4: Update the test tooling
 
-Read the file first. If you added new send functions in Solidity with different signatures, add corresponding Go helper functions that call the new contract methods. The existing `SendInstruction` helper calls the scaffold's default send function — add similar helpers for your new functions if needed.
+Read `tools/pkg/utils/instructions.go`. If you added send functions with new signatures, add matching Go helpers. Then update `tools/cmd/run-test/main.go` with payloads and response assertions.
 
-## Data Flow Reference
+`tools/` is deliberately independent of every language implementation — declare expected response shapes as local structs there, never import them from a language directory. That independence is what lets one test path serve all languages.
 
+### Step 5: Update the conformance fixtures
+
+If you changed any handler's request or response shape, the golden fixtures no longer match. Edit `testdata/conformance/gen_fixtures.py` to describe the new operations, then regenerate:
+
+```bash
+./python/.venv/bin/python testdata/conformance/gen_fixtures.py
 ```
-Solidity contract
-    |  _message (raw bytes, typically JSON)
-    v
-TeeExtensionRegistry.sendInstructions()
-    |  wraps into DataFixed{OPType, OPCommand, OriginalMessage}
-    v
-TEE node -> POST /action -> actionHandler()
-    |  decodes teetypes.Action from request body
-    v
-processAction()
-    |  parses DataFixed from action.Data.Message
-    |  routes based on dataFixed.OPType
-    v
-your handler function
-    |  decodes YOUR request type from df.OriginalMessage
-    |  executes YOUR logic
-    |  returns ActionResult with YOUR response in Data field
-    v
-buildResult() -> JSON response -> TEE node -> proxy -> caller
-```
+
+Skipping this is the most common way to leave the repo in a state where `test-conformance.sh` fails for reasons unrelated to the user's change.
 
 ## Verification
 
-After all steps, run from the scaffold root:
+Run all three layers, cheapest first:
+
+```bash
+./scripts/test-unit.sh
+```
+
+```bash
+./scripts/test-conformance.sh
+```
 
 ```bash
 cd tools && go build ./...
 ```
 
-Then from the root module:
+If the user maintains more than one language, also run `./scripts/test-conformance.sh --all` — implementations must stay byte-identical on the wire.
 
-```bash
-go build ./...
-```
-
-If both succeed, all imports and type references are correct. Report the result to the user.
+Report the results to the user plainly, including any failures with their output.
 
 ## Important Notes
 
-- **Do NOT modify infrastructure code** — functions like `buildResult()`, `actionHandler()`, `stateHandler()` (the generic parts), and files in `cmd/main.go`, `pkg/server/` are boilerplate marked "DO NOT MODIFY".
+- **Do NOT modify infrastructure code.** Anything marked "DO NOT MODIFY" is boilerplate: `go/internal/extension/utils.go`, `go/pkg/server/`, `python/base/`, `typescript/src/base/`. Your changes belong in the app layer.
 - **Always read each file before editing** to confirm current content.
-- **OPType strings must match exactly** across Solidity and Go. If they don't match, actions will fall through to the `default` case and return "unsupported op type".
-- **Run `./scripts/generate-bindings.sh`** after any Solidity changes.
+- **Op-type strings must match exactly** across Solidity and the extension language.
+- **Consult `docs/extension-contract.md`** for anything wire-format related. It is normative, and it documents traps — notably that `ActionResult.version` is a plain string while `StateResponse.stateVersion` is bytes32.
+- If the user maintains multiple languages, **apply the change to all of them**, or state clearly which you changed and which you left behind.
 - Use `replace_all: true` when replacing identifiers that appear multiple times in a file.

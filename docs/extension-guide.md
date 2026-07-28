@@ -2,6 +2,10 @@
 
 This guide explains how the extension scaffold works and how to implement your own logic.
 
+> **This guide's code examples are Go.** The scaffold also ships Python (`python/`) and TypeScript (`typescript/`) implementations of the same extension, selected with `LANGUAGE` in `.env`. The architecture, data flow, op-type matching and 4-step handler pattern described here are identical in all three — only the syntax differs. Where this guide says `go/internal/config/config.go`, the equivalents are `python/app/config.py` and `typescript/src/app/config.ts`; for `go/internal/extension/extension.go`, they are `python/app/handlers.py` and `typescript/src/app/handlers.ts`.
+>
+> For the language-independent specification of the HTTP surface, wire format and container requirements — including what to implement if you are adding a fourth language — see [extension-contract.md](extension-contract.md).
+
 ## How an Extension Works
 
 An extension is an HTTP server that runs inside a Trusted Execution Environment (TEE). It receives instructions from the blockchain, processes them, and returns results. The full lifecycle:
@@ -25,29 +29,42 @@ Your extension controls steps 1 (the contract) and 6 (the action handler). Every
 ┌─────────────────────────────────────────────────────┐
 │  YOUR CODE (what you customize)                     │
 │                                                     │
-│  contracts/InstructionSender.sol    On-chain entry   │
-│  internal/config/config.go         OPType constants  │
-│  internal/extension/extension.go   Action handlers   │
-│  pkg/types/types.go                Request/response  │
+│  contracts/InstructionSender.sol   On-chain entry   │
+│  <lang> config                     OPType constants │
+│  <lang> handlers                   Action handlers  │
 │  tools/cmd/run-test/main.go        E2E tests        │
 └─────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────┐
 │  INFRASTRUCTURE (do not modify)                     │
 │                                                     │
-│  cmd/main.go                       Server entry      │
-│  pkg/server/server.go              Server wrapper    │
-│  buildResult()                     Result builder    │
-│  actionHandler()                   HTTP handler      │
-│  scripts/*                         Build/deploy      │
-│  tools/cmd/deploy-contract/        Deployment        │
-│  tools/cmd/register-*/             Registration      │
+│  <lang> framework layer            Server, routing  │
+│  buildResult() / envelope          Result builder   │
+│  scripts/*                         Build/deploy     │
+│  tools/cmd/deploy-contract/        Deployment       │
+│  tools/cmd/register-*/             Registration     │
 └─────────────────────────────────────────────────────┘
 ```
 
+## File map by language
+
+The guide below uses Go for its examples. These are the equivalents:
+
+| Role | Go | Python | TypeScript |
+|---|---|---|---|
+| Op constants | `go/internal/config/config.go` | `python/app/config.py` | `typescript/src/app/config.ts` |
+| Handlers | `go/internal/extension/extension.go` | `python/app/handlers.py` | `typescript/src/app/handlers.ts` |
+| Request/response types | `go/pkg/types/types.go` | declared inline in handlers | declared inline in handlers |
+| ABI decoding | `go/pkg/types/types.go` (`abi.Argument`) | `python/app/abi.py` | `typescript/src/app/abi.ts` |
+| Framework (don't touch) | `internal/extension/utils.go`, `pkg/server/` | `python/base/` | `typescript/src/base/` |
+| Entry point | `go/cmd/main.go` | `python/main.py` | `typescript/src/main.ts` |
+| Shared, language-neutral | `contracts/`, `scripts/`, `tools/`, `config/` | — | — |
+
+Each language directory has its own README with the specifics: [go/](../go/README.md), [python/](../python/README.md), [typescript/](../typescript/README.md).
+
 ## The Files You Modify
 
-### 1. `internal/config/config.go` — Operation Type Constants
+### 1. `go/internal/config/config.go` — Operation Type Constants
 
 This file defines the string constants for your operation types. Each constant is hashed to `bytes32` at runtime using `teeutils.ToHash()` and compared against the `OPType` field in incoming actions.
 
@@ -69,7 +86,7 @@ bytes32 constant OP_COMMAND_SAY_HELLO  = bytes32("SAY_HELLO");
 bytes32 constant OP_COMMAND_SAY_GOODBYE = bytes32("SAY_GOODBYE");
 ```
 
-### 2. `pkg/types/types.go` — Request and Response Types
+### 2. `go/pkg/types/types.go` — Request and Response Types
 
 This file defines the JSON structures for your extension's inputs and outputs.
 
@@ -113,7 +130,7 @@ type State struct {
 }
 ```
 
-### 3. `internal/extension/extension.go` — Action Handlers
+### 3. `go/internal/extension/extension.go` — Action Handlers
 
 This is the main file. It contains:
 
@@ -327,18 +344,25 @@ Extensions can request the TEE to sign data or perform cryptographic operations 
 
 The sign port is available at `localhost:{SIGN_PORT}` from within the extension.
 
+**The sign port speaks base64, not hex.** tee-node is Go, and Go marshals `[]byte` as base64 in JSON — so `/decrypt` takes `{"encryptedMessage": "<base64>"}` and returns `{"decryptedMessage": "<base64>"}`, unlike the hex used everywhere else on the wire. Python and TypeScript wrap this in `base/node.py` and `src/base/node.ts` respectively, so prefer `NodeClient` over hand-rolling the call. See [extension-contract.md §3](extension-contract.md).
+
 ## Step-by-Step: Adding a New Operation
 
-1. **Add constants** in `internal/config/config.go` — one `OPType` constant for the operation group and one `OPCommand` constant per individual command
-2. **Define request/response types** in `pkg/types/types.go` — one request/response pair per command, plus any new fields in `State`
-3. **Add a case** in `processAction()` in `internal/extension/extension.go` — route on `OPType` to a sub-router function (e.g. `processGreeting`)
-4. **Write the sub-router** — switch on `OPCommand` and dispatch to individual handler functions
-5. **Write each handler function** following the 4-step pattern (decode → validate → execute → build response). Use `structs.DecodeTo` for ABI-encoded messages or `json.Decoder` for JSON messages
-6. **Add any new state fields** to the `Extension` struct and expose them in `stateHandler()` via `types.State`
+Steps 1–6 are language-specific; the rest are shared. Substitute your language's files using the map above, or let the `/create-extension` skill dispatch for you.
+
+1. **Add constants** — one `OPType` for the operation group, one `OPCommand` per command
+2. **Define request/response shapes** — a pair per command, plus any new state fields
+3. **Route the operation** — Go adds a `case` in `processAction()`; Python and TypeScript call `framework.handle(opType, opCommand, handler)` in `register()`
+4. **Write the sub-router** (Go only) — switch on `OPCommand` and dispatch to individual handlers. Python and TypeScript get this from the registry
+5. **Write each handler** following the 4-step pattern: decode → validate → execute → respond. For ABI-encoded messages use `structs.DecodeTo` (Go), `eth_abi.decode` (Python), or `decodeAbiParameters` (TypeScript); for JSON use the language's decoder
+6. **Expose new state** — Go adds fields to the `Extension` struct and maps them in `stateHandler()`; Python and TypeScript extend `report_state()` / `reportState()`. Keep the JSON keys identical across languages
 7. **Add the Solidity constants and send function** in `contracts/InstructionSender.sol`
-8. **Regenerate bindings**: `./scripts/generate-bindings.sh`
-9. **Update the Go tooling** — in `tools/pkg/utils/instructions.go`, update the import path from `helloworld` to your package, rename type references (e.g. `helloworld.DeployHelloWorldInstructionSender` → `orderbook.DeployOrderbookInstructionSender`, `helloworld.NewHelloWorldInstructionSender` → `orderbook.NewOrderbookInstructionSender`), and rename the send function call (e.g. `sender.SendSayHello` → `sender.SendPlaceOrder`) to match your new Solidity function name
+8. **Regenerate bindings**: `./scripts/generate-bindings.sh` — required in every language, since the deployment tooling is Go
+9. **Update the Go tooling** — in `tools/pkg/utils/instructions.go`, update the import path from `helloworld` to your package, rename type references (e.g. `helloworld.DeployHelloWorldInstructionSender` → `orderbook.DeployOrderbookInstructionSender`), and rename the send function call (e.g. `sender.SendSayHello` → `sender.SendPlaceOrder`) to match your new Solidity function name
 10. **Add a test case** in `tools/cmd/run-test/main.go`
+11. **Regenerate the conformance fixtures** — `./python/.venv/bin/python testdata/conformance/gen_fixtures.py` — then `./scripts/test-conformance.sh --all`
+
+> If you maintain more than one language, apply steps 1–6 to each. `./scripts/test-conformance.sh --all` is what catches a language you forgot: the implementations must stay byte-identical on the wire.
 
 ## Common Patterns
 

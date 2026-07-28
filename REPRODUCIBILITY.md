@@ -1,8 +1,33 @@
 # Reproducible Builds
 
-This extension produces reproducible Docker images. Given the same source code,
-builds produce bit-for-bit identical image layers regardless of when or where
-they are built.
+The image's code hash is what gets registered on-chain, so build determinism is
+a security property rather than a nicety.
+
+## Reproducibility is not equal across languages
+
+Be precise about what is actually guaranteed. Overclaiming here is worse than
+underclaiming, because the on-chain registration is what depends on it.
+
+| Language | Guarantee | Why |
+| --- | --- | --- |
+| **Go** | **Bit-for-bit across machines** | Static `CGO_ENABLED=0` binary with `-trimpath -buildid=`, on a digest-pinned distroless base. Nothing host-specific survives. |
+| **Python** | **Same-machine only** | pip installs prebuilt manylinux wheels whose contents are fixed, but `.dist-info` metadata and installation layout can vary with the pip/setuptools version present in the base image. |
+| **TypeScript** | **Same-machine only** | `npm ci` reproduces the dependency *tree* from `package-lock.json`, but `node_modules` layout, hoisting and file ordering vary across npm versions. |
+
+For Python and TypeScript, "same-machine" means: rebuilding on the same host
+with the same Docker/pip/npm versions and the same `SOURCE_DATE_EPOCH` yields
+the same digest. It does **not** mean an auditor on different hardware can
+independently reproduce your hash.
+
+If independent third-party verification of the code hash matters for your
+deployment, use the Go path. To tighten Python/TypeScript, pin the runtime base
+images by `sha256` digest (both currently use tag form, marked with a `NOTE:` in
+their Dockerfiles) — this is required before cutting a testnet release.
+
+All three share the same tee-node build: `docker/node-base.Dockerfile` compiles
+it once from a pinned ref on the same digest-pinned golang image, so the
+`server` binary bytes are identical across language images.
+`scripts/check-versions.sh` fails the build if that pin drifts from `go/go.mod`.
 
 ## How it works
 
@@ -24,17 +49,25 @@ they are built.
 
 ## Build context
 
-The default build is self-contained: the build context is the extension
-directory itself (`docker-compose.yaml` sets `context: .`, `dockerfile:
-Dockerfile`). `go.mod` pins `github.com/flare-foundation/tee-node` to a released
-version and fetches it from the network (verified against `go.sum`), so the
-build needs only this repo's own sources — no sibling `tee-node/` checkout.
+The default build is self-contained: the build context is the repo root
+(`docker-compose.yaml` sets `context: .`, `dockerfile: ${EXTENSION_DOCKERFILE}`,
+resolved from `LANGUAGE`). `go/go.mod` pins
+`github.com/flare-foundation/tee-node` to a released version and fetches it from
+the network (verified against `go.sum`), so the build needs only this repo's own
+sources — no sibling `tee-node/` checkout.
+
+Each language ships a `<lang>/Dockerfile.dockerignore`. BuildKit prefers those
+over the root `.dockerignore`, and each one excludes the *other* language
+directories along with `node_modules/`, `__pycache__/` and `.venv/`. This is not
+only a build-speed concern: anything reachable in the context can perturb layer
+hashes, so a stray local `node_modules` would otherwise undermine determinism.
 
 > **Developing `tee-node`/`tee-proxy` locally?** Run
 > `USE_LOCAL_SIBLINGS=1 ./scripts/start-services.sh`, which builds from on-disk
-> sibling checkouts via `Dockerfile.siblings` (build context `tee/`). That path
-> is for local iteration only — it uses whatever is checked out and is **not**
-> reproducible.
+> sibling checkouts via `go/Dockerfile.siblings` (build context `tee/`). That
+> path is Go-only and is for local iteration — it uses whatever is checked out
+> and is **not** reproducible. `start-services.sh` rejects it for other
+> languages, which build tee-node from the pinned ref instead.
 
 ## Verifying a remote image
 

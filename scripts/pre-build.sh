@@ -85,6 +85,12 @@ step 0 "Generate Go bindings"
 
 # --- Step 1: Pre-flight check ---
 step 1 "Pre-flight check"
+
+# Dependency pins must agree before anything is built: non-Go language images
+# compile tee-node from source, and drift against the Go module pin surfaces
+# later as an opaque signature-verification failure.
+"$SCRIPT_DIR/check-versions.sh" || die "dependency version pins are inconsistent"
+
 cd "$PROJECT_DIR/tools"
 if ! go run ./cmd/deploy-contract -a "$ADDRESSES_FILE" -c "$CHAIN_URL" --preflight-only 2>&1; then
     die "Pre-flight check failed — fix the issues above before deploying"

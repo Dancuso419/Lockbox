@@ -24,9 +24,14 @@ services:
   extension-tee:
     build:
       context: .
-      dockerfile: Dockerfile
+      # Selected by LANGUAGE in .env; start-services.sh resolves <LANGUAGE>/Dockerfile
+      # by directory convention. Adding a language needs no change here.
+      dockerfile: ${EXTENSION_DOCKERFILE:-go/Dockerfile}
       args:
-        SOURCE_DATE_EPOCH: ${SOURCE_DATE_EPOCH}
+        SOURCE_DATE_EPOCH: ${SOURCE_DATE_EPOCH:-0}
+        # Consumed by language images that build tee-node from source. A Go
+        # pseudo-version pin is a commit SHA, not a tag — see scripts/lib/versions.sh.
+        TEE_NODE_REF: ${TEE_NODE_REF:-}
     env_file:
       - path: ./config/extension.env
         required: false
@@ -47,6 +52,7 @@ services:
       - SIGN_PORT=7701
       - EXTENSION_PORT=7702
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - SIMULATED_TEE=${SIMULATED_TEE:-true}
     depends_on:
       - ext-proxy
 

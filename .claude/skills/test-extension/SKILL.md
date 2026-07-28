@@ -15,9 +15,9 @@ The user wants to write or run tests for their extension. They may say things li
 
 Before starting, read these files to understand what operations exist and what types are defined:
 
-1. `internal/config/config.go` — what OPType constants exist
+1. Your language's config — `go/internal/config/config.go`, `python/app/config.py`, or `typescript/src/app/config.ts` — what OPType constants exist
 2. `contracts/InstructionSender.sol` — what send functions exist
-3. `pkg/types/types.go` — what request/response types are defined
+3. Your language's request/response shapes — `go/pkg/types/types.go`, or the handlers in `python/app/handlers.py` / `typescript/src/app/handlers.ts`
 4. `tools/cmd/run-test/main.go` — current test state
 5. `tools/pkg/utils/instructions.go` — what send helpers exist
 
@@ -27,7 +27,7 @@ All paths are relative to the scaffold root (the directory containing `foundry.t
 
 ### Step 1: Define response type(s) at top of `tools/cmd/run-test/main.go`
 
-Read the file first. Add structs that **mirror** (not import) your response types from `pkg/types/types.go`. The scaffold has:
+Read the file first. Add structs that **mirror** (not import) your response shapes. `tools/` is deliberately independent of every language implementation — that independence is what lets one test path serve Go, Python and TypeScript alike. The scaffold has:
 
 ```go
 type SayHelloResponse struct {
@@ -40,7 +40,7 @@ These are defined separately in the test file because the test tool module is in
 
 ### Step 2: Build test payload(s) matching request types
 
-Create JSON payloads matching your request types from `pkg/types/types.go`. The scaffold sends:
+Create JSON payloads matching your request shapes. The scaffold sends:
 
 ```go
 payload, _ := json.Marshal(map[string]interface{}{
@@ -166,5 +166,6 @@ Report the result to the user.
 
 - **Do NOT modify the generic parts of `verifyResult()`** — the polling logic, status checks, and retry loop are infrastructure code.
 - **Do NOT modify the `SetExtensionId` call** — it's required boilerplate.
-- **Response types in the test file should mirror (not import) types from `pkg/types/types.go`** — the test tool module is separate from the main extension module.
+- **Response types in the test file must mirror, never import, the extension's types** — `tools/` is a standalone module with no dependency on any language implementation, which is what lets `./scripts/test.sh` run unchanged against every language.
+- **Before the on-chain test, run the cheaper layers**: `./scripts/test-unit.sh` and `./scripts/test-conformance.sh`. If a handler's shape changed, also regenerate the golden fixtures with `./python/.venv/bin/python testdata/conformance/gen_fixtures.py`.
 - Always read each file before editing to confirm current content.
