@@ -39,8 +39,11 @@ contract Pool is EIP712, ReentrancyGuard {
     error BadSignature();
     error ExceedsDeposited();
     error NativeTransferFailed();
+    error NotOrganizer();
+    error BeforeDeadline();
 
     event Claimed(address indexed recipient, uint256 amount, uint256 nonce);
+    event Swept(address indexed organizer, uint256 amount);
 
     constructor(
         address _organizer,
@@ -96,6 +99,17 @@ contract Pool is EIP712, ReentrancyGuard {
         // interaction
         _payout(msg.sender, amount);
         emit Claimed(msg.sender, amount, nonce);
+    }
+
+    function sweep() external nonReentrant {
+        if (status != Status.Open) revert NotOpen();
+        if (msg.sender != organizer) revert NotOrganizer();
+        if (block.timestamp <= deadline) revert BeforeDeadline();
+
+        uint256 amount = totalDeposited - totalClaimed;
+        status = Status.Closed;
+        _payout(organizer, amount);
+        emit Swept(organizer, amount);
     }
 
     function _payout(address to, uint256 amount) private {

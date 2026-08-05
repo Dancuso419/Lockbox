@@ -152,4 +152,58 @@ contract PoolTest is Test {
         vm.expectRevert(Pool.BadSignature.selector); // poolB domain differs
         poolB.claim(3 ether, 1, sigForA);
     }
+
+    function test_sweep_returnsRemainderToOrganizer() public {
+        Pool pool = _deployNativePool(10 ether);
+        address recipient = address(0xBEEF);
+        bytes memory sig = _sign(pool, recipient, 3 ether, 1);
+        vm.prank(recipient);
+        pool.claim(3 ether, 1, sig);
+
+        uint256 orgBefore = organizer.balance;
+        vm.warp(deadline + 1);
+        vm.prank(organizer);
+        pool.sweep();
+
+        assertEq(organizer.balance, orgBefore + 7 ether);
+        assertEq(uint256(pool.status()), 1); // Closed
+        assertEq(address(pool).balance, 0);
+    }
+
+    function test_sweep_beforeDeadlineReverts() public {
+        Pool pool = _deployNativePool(10 ether);
+        vm.prank(organizer);
+        vm.expectRevert(Pool.BeforeDeadline.selector);
+        pool.sweep();
+    }
+
+    function test_sweep_nonOrganizerReverts() public {
+        Pool pool = _deployNativePool(10 ether);
+        vm.warp(deadline + 1);
+        vm.prank(address(0xBAD));
+        vm.expectRevert(Pool.NotOrganizer.selector);
+        pool.sweep();
+    }
+
+    function test_sweep_secondSweepReverts() public {
+        Pool pool = _deployNativePool(10 ether);
+        vm.warp(deadline + 1);
+        vm.prank(organizer);
+        pool.sweep();
+        vm.prank(organizer);
+        vm.expectRevert(Pool.NotOpen.selector);
+        pool.sweep();
+    }
+
+    function test_claim_afterSweepReverts() public {
+        Pool pool = _deployNativePool(10 ether);
+        address recipient = address(0xBEEF);
+        bytes memory sig = _sign(pool, recipient, 1 ether, 1); // sign before warp/prank
+        vm.warp(deadline + 1);
+        vm.prank(organizer);
+        pool.sweep();
+        vm.prank(recipient);
+        vm.expectRevert(); // PastDeadline or NotOpen — both acceptable
+        pool.claim(1 ether, 1, sig);
+    }
 }
