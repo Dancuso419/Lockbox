@@ -61,4 +61,49 @@ contract PoolFactoryTest is Test {
         factory.createPool{value: 1 ether}(address(token), 100 ether, deadline, signer);
         vm.stopPrank();
     }
+
+    // Rebuild EIP-712 domain separator the way OZ EIP712 does.
+    function _digest(Pool pool, bytes32 structHash) internal view returns (bytes32) {
+        bytes32 domainSeparator = keccak256(
+            abi.encode(
+                keccak256(
+                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                ),
+                keccak256(bytes("ConfidentialPrizePool")),
+                keccak256(bytes("1")),
+                block.chainid,
+                address(pool)
+            )
+        );
+        return keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+    }
+
+    function _sign(Pool pool, address recipient, uint256 amount, uint256 nonce)
+        internal view returns (bytes memory)
+    {
+        bytes32 structHash = keccak256(abi.encode(pool.VOUCHER_TYPEHASH(), recipient, amount, nonce));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, _digest(pool, structHash));
+        return abi.encodePacked(r, s, v);
+    }
+
+    function test_erc20_claimThenSweep() public {
+        MockERC20 token = new MockERC20();
+        token.mint(organizer, 100 ether);
+        vm.startPrank(organizer);
+        token.approve(address(factory), 100 ether);
+        Pool pool = factory.createPool(address(token), 100 ether, deadline, signer);
+        vm.stopPrank();
+
+        address recipient = address(0xBEEF);
+        bytes memory sig = _sign(pool, recipient, 40 ether, 1); // sign before prank
+        vm.prank(recipient);
+        pool.claim(40 ether, 1, sig);
+        assertEq(token.balanceOf(recipient), 40 ether);
+
+        vm.warp(deadline + 1);
+        vm.prank(organizer);
+        pool.sweep();
+        assertEq(token.balanceOf(organizer), 60 ether); // remainder back
+        assertEq(token.balanceOf(address(pool)), 0);
+    }
 }
