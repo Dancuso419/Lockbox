@@ -41,6 +41,10 @@ contract PoolFactory {
         } else {
             if (msg.value != 0) revert NativeValueWithERC20();
             pool = new Pool(msg.sender, asset, totalAmount, deadline, authorizedSigner);
+            // NOTE: assumes a standard ERC-20 whose transfer moves exactly `totalAmount`.
+            // Fee-on-transfer / rebasing tokens would make the pool record more than it
+            // actually receives, breaking the over-allocation cap. Such tokens are out of
+            // scope (target assets: native C2FLR and FXRP, neither is fee-on-transfer).
             IERC20(asset).safeTransferFrom(msg.sender, address(pool), totalAmount);
         }
 

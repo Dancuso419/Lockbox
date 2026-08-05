@@ -206,4 +206,51 @@ contract PoolTest is Test {
         vm.expectRevert(); // PastDeadline or NotOpen — both acceptable
         pool.claim(1 ether, 1, sig);
     }
+
+    function test_claim_zeroAmountReverts() public {
+        Pool pool = _deployNativePool(10 ether);
+        address recipient = address(0xBEEF);
+        bytes memory sig = _sign(pool, recipient, 0, 1);
+        vm.prank(recipient);
+        vm.expectRevert(Pool.ZeroAmount.selector);
+        pool.claim(0, 1, sig);
+    }
+
+    function test_claim_exactFillSucceeds() public {
+        Pool pool = _deployNativePool(10 ether);
+        address recipient = address(0xBEEF);
+        bytes memory sig = _sign(pool, recipient, 10 ether, 1); // exactly the whole pool
+        vm.prank(recipient);
+        pool.claim(10 ether, 1, sig);
+        assertEq(recipient.balance, 10 ether);
+        assertEq(pool.totalClaimed(), 10 ether);
+        assertEq(pool.remaining(), 0);
+    }
+
+    function test_claim_revertingReceiver_doesNotWedgePool() public {
+        Pool pool = _deployNativePool(10 ether);
+        RevertingReceiver bad = new RevertingReceiver();
+        bytes memory badSig = _sign(pool, address(bad), 3 ether, 1);
+        vm.prank(address(bad));
+        vm.expectRevert(Pool.NativeTransferFailed.selector);
+        pool.claim(3 ether, 1, badSig);
+
+        // failed claim rolled back cleanly: nonce free, nothing claimed
+        assertEq(pool.totalClaimed(), 0);
+        assertFalse(pool.usedNonce(1));
+
+        // a good recipient can still claim
+        address good = address(0xBEEF);
+        bytes memory goodSig = _sign(pool, good, 3 ether, 2);
+        vm.prank(good);
+        pool.claim(3 ether, 2, goodSig);
+        assertEq(good.balance, 3 ether);
+        assertEq(pool.totalClaimed(), 3 ether);
+    }
+}
+
+contract RevertingReceiver {
+    receive() external payable {
+        revert("no");
+    }
 }

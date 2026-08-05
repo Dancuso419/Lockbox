@@ -81,6 +81,7 @@ contract Pool is EIP712, ReentrancyGuard {
         external
         nonReentrant
     {
+        if (amount == 0) revert ZeroAmount();
         if (status != Status.Open) revert NotOpen();
         if (block.timestamp > deadline) revert PastDeadline();
         if (usedNonce[nonce]) revert NonceUsed();
