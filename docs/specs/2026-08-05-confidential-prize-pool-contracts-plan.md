@@ -453,15 +453,21 @@ Append to `test/Pool.t.sol`:
 
     function test_claim_overAllocationReverts() public {
         Pool pool = _deployNativePool(10 ether);
-        address r1 = address(0x1);
-        address r2 = address(0x2);
+        address r1 = makeAddr("r1");
+        address r2 = makeAddr("r2");
+        // Sign BEFORE pranking: _sign() calls pool.VOUCHER_TYPEHASH(), which would
+        // otherwise consume the prank and leave claim() with the wrong msg.sender.
+        // Also: never use precompile addresses (0x1, 0x2) as EOAs in tests.
+        bytes memory sig1 = _sign(pool, r1, 7 ether, 1);
+        bytes memory sig2 = _sign(pool, r2, 4 ether, 2);
+
         vm.prank(r1);
-        pool.claim(7 ether, 1, _sign(pool, r1, 7 ether, 1));
+        pool.claim(7 ether, 1, sig1);
 
         // second claim of 4 would exceed 10 total
         vm.prank(r2);
         vm.expectRevert(Pool.ExceedsDeposited.selector);
-        pool.claim(4 ether, 2, _sign(pool, r2, 4 ether, 2));
+        pool.claim(4 ether, 2, sig2);
     }
 
     function test_claim_afterDeadlineReverts() public {
