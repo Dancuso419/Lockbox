@@ -7,3 +7,5 @@ libs = ["lib"]
 # and restore the remapping:
 #   remappings = ["flare-smart-contracts-v2=lib/flare-smart-contracts-v2"]
 via-ir = true
+ffi = true
+fs_permissions = [{ access = "read", path = "./bin" }]
