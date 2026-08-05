@@ -105,6 +105,7 @@ signature       = crypto.Sign(digest, key); signature[64] += 27   // V -> {27,28
 - **`VOUCHER_SIGNING_KEY` handling:** a funded key is not required (the signer never sends txs — recipients do). It only signs digests. Keep it out of git (`.env`), document setting `Pool.authorizedSigner = signer address` at pool creation.
 - **tee-node `Action` caller field:** the signed-challenge design intentionally avoids depending on it. If we later confirm the Action exposes `claimBackAddress`, we may cross-check it equals the recovered recipient (defense in depth) — not required for correctness.
 - **ECIES scheme:** use `go-ethereum/crypto/ecies` (`ImportECDSA`, `Encrypt`/`Decrypt`) with the secp256k1 key; recipient pubkeys are 65-byte uncompressed hex. Document the exact scheme so the organizer/recipient tooling matches.
+- **Off-chain recipient signer contract:** the CLAIM_VERIFY challenge is `"ConfidentialPrizePool claim\npool:<EIP-55 checksum pool>\nkey:<0x04 uncompressed pubHex>"`, signed as an EIP-191 `personal_sign` message with the challenge-sig `V` normalized to 27/28 (the handler rejects raw `V<27`). Recipient tooling MUST use the checksummed pool address and 27/28 `V`, or recovery yields the wrong address and the claim is rejected as "not eligible".
 
 ## 9. Testing
 
