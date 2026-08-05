@@ -50,3 +50,32 @@ func sigWithV0(sig []byte) []byte {
 	c[64] -= 27
 	return c
 }
+
+func TestECIES_Roundtrip(t *testing.T) {
+	s, _ := NewFromHex(testKeyHex, big.NewInt(114))
+	msg := []byte(`{"allocations":[{"recipient":"0x00..bEEF","amount":"3"}]}`)
+
+	ct, err := EncryptTo(s.PubKeyHex(), msg)
+	if err != nil {
+		t.Fatalf("EncryptTo: %v", err)
+	}
+	if len(ct) == 0 || string(ct) == string(msg) {
+		t.Fatal("ciphertext not produced")
+	}
+	pt, err := s.Decrypt(ct)
+	if err != nil {
+		t.Fatalf("Decrypt: %v", err)
+	}
+	if string(pt) != string(msg) {
+		t.Fatalf("roundtrip mismatch: %q != %q", pt, msg)
+	}
+}
+
+func TestECIES_WrongKeyFails(t *testing.T) {
+	s1, _ := NewFromHex(testKeyHex, big.NewInt(114))
+	s2, _ := NewFromHex("983760a4ebf75b2ac3a93531168a0f225d01e5dc6e3568adbd46233ba1fb4fa4", big.NewInt(114))
+	ct, _ := EncryptTo(s1.PubKeyHex(), []byte("secret"))
+	if _, err := s2.Decrypt(ct); err == nil {
+		t.Fatal("expected decrypt with wrong key to fail")
+	}
+}

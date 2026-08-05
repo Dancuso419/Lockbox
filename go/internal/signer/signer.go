@@ -4,10 +4,12 @@ package signer
 
 import (
 	"crypto/ecdsa"
+	"crypto/rand"
 	"math/big"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/ethereum/go-ethereum/crypto/ecies"
 )
 
 // Must byte-match Pool.sol: EIP712("ConfidentialPrizePool","1") and
@@ -76,4 +78,27 @@ func (s *Signer) SignVoucher(pool, recipient common.Address, amount, nonce *big.
 	}
 	sig[64] += 27
 	return sig, nil
+}
+
+// PubKeyHex returns the uncompressed public key as 0x-prefixed hex (65 bytes:
+// 0x04||X||Y) — what callers ECIES-encrypt to.
+func (s *Signer) PubKeyHex() string {
+	return "0x" + common.Bytes2Hex(crypto.FromECDSAPub(&s.key.PublicKey))
+}
+
+// EncryptTo ECIES-encrypts plaintext to a secp256k1 uncompressed pubkey hex.
+func EncryptTo(pubHex string, plaintext []byte) ([]byte, error) {
+	raw := common.FromHex(pubHex)
+	pub, err := crypto.UnmarshalPubkey(raw)
+	if err != nil {
+		return nil, err
+	}
+	epub := ecies.ImportECDSAPublic(pub)
+	return ecies.Encrypt(rand.Reader, epub, plaintext, nil, nil)
+}
+
+// Decrypt ECIES-decrypts ciphertext with the signer's private key.
+func (s *Signer) Decrypt(ciphertext []byte) ([]byte, error) {
+	epriv := ecies.ImportECDSA(s.key)
+	return epriv.Decrypt(ciphertext, nil, nil)
 }
