@@ -5,23 +5,23 @@ pragma solidity ^0.8.27;
 import { ITeeExtensionRegistry } from "./interfaces/ITeeExtensionRegistry.sol";
 import { ITeeMachineRegistry } from "./interfaces/ITeeMachineRegistry.sol";
 
-/// @title HelloWorldInstructionSender
+/// @title PrizePoolInstructionSender
 /// @author Flare Foundation
-/// @notice Hello World example — on-chain entry point for sending instructions to the TEE.
+/// @notice Confidential Prize Pool — on-chain entry point for sending instructions to the TEE.
 ///
 /// DO NOT MODIFY: constructor, setExtensionId(), _getExtensionId()
-contract HelloWorldInstructionSender {
-    /// @notice Operation type for greeting actions (SAY_HELLO, SAY_GOODBYE).
+contract PrizePoolInstructionSender {
+    /// @notice Operation type for prize pool actions.
     // forge-lint: disable-next-line(unsafe-typecast)
-    bytes32 public constant OP_TYPE_GREETING = bytes32("GREETING");
+    bytes32 public constant OP_TYPE_PRIZEPOOL = bytes32("PRIZEPOOL");
 
-    /// @notice Command for the SAY_HELLO action.
+    /// @notice Command for the SUBMIT_ALLOCATION action.
     // forge-lint: disable-next-line(unsafe-typecast)
-    bytes32 public constant OP_COMMAND_SAY_HELLO = bytes32("SAY_HELLO");
+    bytes32 public constant OP_COMMAND_SUBMIT_ALLOCATION = bytes32("SUBMIT_ALLOCATION");
 
-    /// @notice Command for the SAY_GOODBYE action.
+    /// @notice Command for the CLAIM_VERIFY action.
     // forge-lint: disable-next-line(unsafe-typecast)
-    bytes32 public constant OP_COMMAND_SAY_GOODBYE = bytes32("SAY_GOODBYE");
+    bytes32 public constant OP_COMMAND_CLAIM_VERIFY = bytes32("CLAIM_VERIFY");
 
     /// @notice Reference to the TEE extension registry contract.
     ITeeExtensionRegistry public immutable TEE_EXTENSION_REGISTRY;
@@ -34,11 +34,8 @@ contract HelloWorldInstructionSender {
 
     uint256 private _extensionId;
 
-    /// @notice Payload for the SAY_GOODBYE instruction.
-    struct SayGoodbyeMessage {
-        string name;
-        string reason;
-    }
+    struct SubmitAllocationMessage { bytes ciphertext; address pool; }
+    struct ClaimVerifyMessage { bytes payload; address pool; }
 
     /// @notice Initializes the contract with registry addresses.
     /// @param _teeExtensionRegistry Address of the TEE extension registry.
@@ -70,48 +67,34 @@ contract HelloWorldInstructionSender {
         revert("Extension ID not found.");
     }
 
-    /// @notice Sends a SAY_HELLO instruction to the TEE.
-    /// @param _message JSON-encoded payload (e.g. {"name": "Alice"}).
-    function sendSayHello(bytes calldata _message) external payable {
+    /// @notice Submit an encrypted allocation table for `pool` to the TEE.
+    function sendSubmitAllocation(bytes calldata ciphertext, address pool) external payable {
         address[] memory teeIds = TEE_MACHINE_REGISTRY.getRandomTeeIds(_getExtensionId(), 1);
         address[] memory cosigners = new address[](0);
-
         ITeeExtensionRegistry.TeeInstructionParams memory params = ITeeExtensionRegistry.TeeInstructionParams({
-            opType: OP_TYPE_GREETING,
-            opCommand: OP_COMMAND_SAY_HELLO,
-            message: _message,
+            opType: OP_TYPE_PRIZEPOOL,
+            opCommand: OP_COMMAND_SUBMIT_ALLOCATION,
+            message: abi.encode(SubmitAllocationMessage({ciphertext: ciphertext, pool: pool})),
             cosigners: cosigners,
             cosignersThreshold: 0,
             claimBackAddress: msg.sender
         });
-
-
-        TEE_EXTENSION_REGISTRY.sendInstructions{value: msg.value}(
-            teeIds,
-            params
-        );
+        TEE_EXTENSION_REGISTRY.sendInstructions{value: msg.value}(teeIds, params);
     }
 
-    /// @notice Sends a SAY_GOODBYE instruction to the TEE.
-    /// @param _name The name of the person to say goodbye to.
-    /// @param _reason The reason for saying goodbye.
-    function sendSayGoodbye(string calldata _name, string calldata _reason) external payable {
+    /// @notice Request a voucher for `pool`; `payload` carries recipient enc pubkey + challenge sig.
+    function sendClaimVerify(bytes calldata payload, address pool) external payable {
         address[] memory teeIds = TEE_MACHINE_REGISTRY.getRandomTeeIds(_getExtensionId(), 1);
         address[] memory cosigners = new address[](0);
-
         ITeeExtensionRegistry.TeeInstructionParams memory params = ITeeExtensionRegistry.TeeInstructionParams({
-            opType: OP_TYPE_GREETING,
-            opCommand: OP_COMMAND_SAY_GOODBYE,
-            message: abi.encode(SayGoodbyeMessage({name: _name, reason: _reason})),
+            opType: OP_TYPE_PRIZEPOOL,
+            opCommand: OP_COMMAND_CLAIM_VERIFY,
+            message: abi.encode(ClaimVerifyMessage({payload: payload, pool: pool})),
             cosigners: cosigners,
             cosignersThreshold: 0,
             claimBackAddress: msg.sender
         });
-
-        TEE_EXTENSION_REGISTRY.sendInstructions{value: msg.value}(
-            teeIds,
-            params
-        );
+        TEE_EXTENSION_REGISTRY.sendInstructions{value: msg.value}(teeIds, params);
     }
 
     /// @notice Returns the cached extension ID, reverting if not yet set.

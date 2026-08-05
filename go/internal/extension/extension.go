@@ -1,17 +1,18 @@
 package extension
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
 
+	"extension-scaffold/internal/allocations"
+	"extension-scaffold/internal/chain"
 	"extension-scaffold/internal/config"
+	"extension-scaffold/internal/signer"
 	"extension-scaffold/pkg/types"
 
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
-	"github.com/flare-foundation/go-flare-common/pkg/tee/structs"
 	teetypes "github.com/flare-foundation/tee-node/pkg/types"
 	teeutils "github.com/flare-foundation/tee-node/pkg/utils"
 
@@ -22,34 +23,28 @@ type Extension struct {
 	mu     sync.RWMutex
 	Server *http.Server
 
-	greetingCount int
-	lastGreeting  string
-	farewellCount int
-	lastFarewell  string
+	signer *signer.Signer
+	store  *allocations.Store
+	reader *chain.Reader
 }
 
-// --- DO NOT MODIFY: New(), actionHandler() are boilerplate.
-func New(extensionPort, signPort int) *Extension {
-	e := &Extension{}
-
+func New(extensionPort, signPort int, s *signer.Signer, store *allocations.Store, reader *chain.Reader) *Extension {
+	e := &Extension{signer: s, store: store, reader: reader}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /state", e.stateHandler)
 	mux.HandleFunc("POST /action", e.actionHandler)
-
 	e.Server = &http.Server{Addr: fmt.Sprintf(":%d", extensionPort), Handler: mux}
 	return e
 }
 
-// stateHandler() structure is boilerplate but update the State field mapping to match your Extension fields.
+// stateHandler returns the extension's observable state.
 func (e *Extension) stateHandler(w http.ResponseWriter, r *http.Request) {
 	e.mu.RLock()
 	stateResponse := types.StateResponse{
 		StateVersion: teeutils.ToHash(config.Version),
 		State: types.State{
-			GreetingCount: e.greetingCount,
-			LastGreeting:  e.lastGreeting,
-			FarewellCount: e.farewellCount,
-			LastFarewell:  e.lastFarewell,
+			SignerAddress: e.signer.Address().Hex(),
+			SignerPubKey:  e.signer.PubKeyHex(),
 		},
 	}
 	e.mu.RUnlock()
@@ -68,94 +63,33 @@ func (e *Extension) processAction(action teetypes.Action) (int, []byte) {
 	}
 
 	switch {
-	case dataFixed.OPType == teeutils.ToHash(config.OPTypeGreeting):
-		return e.processGreeting(action, dataFixed)
+	case dataFixed.OPType == teeutils.ToHash(config.OPTypePrizePool):
+		return e.processPrizePool(action, dataFixed)
 
 	default:
 		return http.StatusNotImplemented, []byte(fmt.Sprintf(
 			"unsupported op type: received %s, expected %s (%s)",
-			dataFixed.OPType.Hex(), teeutils.ToHash(config.OPTypeGreeting).Hex(), config.OPTypeGreeting,
+			dataFixed.OPType.Hex(), teeutils.ToHash(config.OPTypePrizePool).Hex(), config.OPTypePrizePool,
 		))
 	}
 }
 
-// processGreeting routes GREETING instructions by OPCommand.
-func (e *Extension) processGreeting(action teetypes.Action, df *instruction.DataFixed) (int, []byte) {
+func (e *Extension) processPrizePool(action teetypes.Action, df *instruction.DataFixed) (int, []byte) {
 	switch {
-	case df.OPCommand == teeutils.ToHash(config.OPCommandSayHello):
-		ar := e.processSayHello(action, df)
-		b, _ := json.Marshal(ar)
+	case df.OPCommand == teeutils.ToHash(config.OPCommandSubmitAllocation):
+		b, _ := json.Marshal(e.processSubmitAllocation(action, df))
 		return http.StatusOK, b
-
-	case df.OPCommand == teeutils.ToHash(config.OPCommandSayGoodbye):
-		ar := e.processSayGoodbye(action, df)
-		b, _ := json.Marshal(ar)
+	case df.OPCommand == teeutils.ToHash(config.OPCommandClaimVerify):
+		b, _ := json.Marshal(e.processClaimVerify(action, df))
 		return http.StatusOK, b
-
 	default:
-		return http.StatusNotImplemented, []byte(fmt.Sprintf(
-			"unsupported op command: received %s, expected one of [%s (%s), %s (%s)]",
-			df.OPCommand.Hex(),
-			teeutils.ToHash(config.OPCommandSayHello).Hex(), config.OPCommandSayHello,
-			teeutils.ToHash(config.OPCommandSayGoodbye).Hex(), config.OPCommandSayGoodbye,
-		))
+		return http.StatusNotImplemented, []byte(fmt.Sprintf("unsupported op command: %s", df.OPCommand.Hex()))
 	}
 }
 
-// processSayHello handles SAY_HELLO instructions: returns a greeting and tracks count.
-func (e *Extension) processSayHello(action teetypes.Action, df *instruction.DataFixed) teetypes.ActionResult {
-	var req types.SayHelloRequest
-	dec := json.NewDecoder(bytes.NewReader(df.OriginalMessage))
-	dec.DisallowUnknownFields()
-	err := dec.Decode(&req)
-	if err != nil {
-		return buildResult(action, df, nil, 0, fmt.Errorf("decoding request: %w", err))
-	}
-
-	if req.Name == "" {
-		return buildResult(action, df, nil, 0, fmt.Errorf("name must not be empty"))
-	}
-
-	e.mu.Lock()
-	e.greetingCount++
-	greetingNumber := e.greetingCount
-	greeting := fmt.Sprintf("Hello, %s! Welcome to Flare Confidential Compute.", req.Name)
-	e.lastGreeting = greeting
-	e.mu.Unlock()
-
-	resp := types.SayHelloResponse{
-		Greeting:       greeting,
-		GreetingNumber: greetingNumber,
-	}
-	data, _ := json.Marshal(resp)
-
-	return buildResult(action, df, data, 1, nil)
+func (e *Extension) processSubmitAllocation(action teetypes.Action, df *instruction.DataFixed) teetypes.ActionResult {
+	return buildResult(action, df, nil, 0, fmt.Errorf("not implemented"))
 }
-
-// processSayGoodbye handles SAY_GOODBYE instructions: returns a farewell and tracks count.
-func (e *Extension) processSayGoodbye(action teetypes.Action, df *instruction.DataFixed) teetypes.ActionResult {
-	var req types.SayGoodbyeRequest
-	err := structs.DecodeTo(types.SayGoodbyeMessageArg, df.OriginalMessage, &req)
-	if err != nil {
-		return buildResult(action, df, nil, 0, fmt.Errorf("decoding request: %w", err))
-	}
-
-	if req.Name == "" {
-		return buildResult(action, df, nil, 0, fmt.Errorf("name must not be empty"))
-	}
-
-	e.mu.Lock()
-	e.farewellCount++
-	farewellNumber := e.farewellCount
-	farewell := fmt.Sprintf("Goodbye, %s! Reason: %s", req.Name, req.Reason)
-	e.lastFarewell = farewell
-	e.mu.Unlock()
-
-	resp := types.SayGoodbyeResponse{
-		Farewell:       farewell,
-		FarewellNumber: farewellNumber,
-	}
-	data, _ := json.Marshal(resp)
-
-	return buildResult(action, df, data, 1, nil)
+func (e *Extension) processClaimVerify(action teetypes.Action, df *instruction.DataFixed) teetypes.ActionResult {
+	return buildResult(action, df, nil, 0, fmt.Errorf("not implemented"))
 }
