@@ -100,6 +100,7 @@ createPool ──> Open ──(claims allowed while block.timestamp <= deadline)
 
 - **Ephemeral TEE key (known gotcha):** the simulated TEE regenerates its signing key on every container restart. Because `authorizedSigner` is immutable, a pool must be created only *after* the final TEE start, and the node must not be restarted for that pool's lifetime, or its vouchers become unverifiable. Documented for the M3/M4 integration and the demo runbook.
 - The TEE's voucher-signing key vs. the ephemeral node key: M4 (Go side) must define which key signs vouchers and expose its address so the organizer sets it as `authorizedSigner` at pool creation. Design assumption: a single ECDSA signer address the contract can `ecrecover`.
+- **Fee-on-transfer / rebasing tokens are out of scope.** `PoolFactory` records `totalDeposited = totalAmount` and assumes the ERC-20 transfer delivers exactly that. A fee-on-transfer or rebasing token would make `totalDeposited` exceed the real balance, so the last claim(s) would revert on payout. Target assets (native C2FLR, FXRP) are standard ERC-20s; do not use this with elastic-supply tokens without a balance-measuring change.
 
 ## 8. Testing (TDD, Foundry)
 
