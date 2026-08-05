@@ -162,6 +162,9 @@ func (e *Extension) handleClaimVerify(ctx context.Context, pool common.Address, 
 	if len(sig) != 65 {
 		return 0, []byte("bad challenge sig")
 	}
+	if sig[64] < 27 {
+		return 0, []byte("bad challenge sig")
+	}
 	rec := make([]byte, 65)
 	copy(rec, sig)
 	rec[64] -= 27

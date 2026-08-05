@@ -90,3 +90,49 @@ func TestClaimVerify_UnknownRecipientRejected(t *testing.T) {
 		t.Fatal("expected rejection for unknown recipient")
 	}
 }
+
+func TestClaimVerify_WrongPoolChallengeRejected(t *testing.T) {
+	sgn, _ := signer.NewFromHex("353c43dada1ebc390f9594ed91753446e19389ae545fc7fada020816346efb73", big.NewInt(114))
+	st := allocations.New()
+	e := &Extension{signer: sgn, store: st, reader: fakeReader{total: big.NewInt(10)}}
+
+	rk, _ := crypto.HexToECDSA("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+	recipient := crypto.PubkeyToAddress(rk.PublicKey)
+	recipientPub := "0x" + common.Bytes2Hex(crypto.FromECDSAPub(&rk.PublicKey))
+
+	poolA := common.Address{19: 1}
+	poolB := common.Address{19: 2}
+	// allocation exists in poolA
+	_ = st.Submit(poolA, []allocations.Input{{Recipient: recipient, Amount: big.NewInt(3)}}, big.NewInt(10))
+
+	// recipient signs a challenge for poolA, but the request is submitted for poolB.
+	msg := challengeMessage(poolA, recipientPub)
+	sig, _ := crypto.Sign(accounts.TextHash([]byte(msg)), rk)
+	sig[64] += 27
+	pb, _ := json.Marshal(types.ClaimVerifyPayload{RecipientPubHex: recipientPub, ChallengeSig: "0x" + common.Bytes2Hex(sig)})
+
+	// Handler rebuilds the challenge with poolB.Hex(), so recovery yields a different
+	// address that has no allocation in poolB -> rejected.
+	status, _ := e.handleClaimVerify(context.Background(), poolB, pb)
+	if status != 0 {
+		t.Fatal("expected wrong-pool challenge to be rejected")
+	}
+}
+
+func TestClaimVerify_MalformedChallengeSigRejected(t *testing.T) {
+	sgn, _ := signer.NewFromHex("353c43dada1ebc390f9594ed91753446e19389ae545fc7fada020816346efb73", big.NewInt(114))
+	e := &Extension{signer: sgn, store: allocations.New(), reader: fakeReader{total: big.NewInt(10)}}
+	pool := common.Address{19: 1}
+	// too-short sig
+	pb, _ := json.Marshal(types.ClaimVerifyPayload{RecipientPubHex: "0x04", ChallengeSig: "0x1234"})
+	if status, _ := e.handleClaimVerify(context.Background(), pool, pb); status != 0 {
+		t.Fatal("expected malformed (short) sig rejected")
+	}
+	// 65 bytes but raw V=0 (must be rejected by the guard, no panic)
+	raw := make([]byte, 65)
+	raw[64] = 0
+	pb2, _ := json.Marshal(types.ClaimVerifyPayload{RecipientPubHex: "0x04", ChallengeSig: "0x" + common.Bytes2Hex(raw)})
+	if status, _ := e.handleClaimVerify(context.Background(), pool, pb2); status != 0 {
+		t.Fatal("expected raw-V=0 sig rejected")
+	}
+}

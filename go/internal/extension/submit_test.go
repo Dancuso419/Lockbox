@@ -57,3 +57,12 @@ func TestSubmitAllocation_RejectsOverDeposit(t *testing.T) {
 		t.Fatal("expected rejection status 0")
 	}
 }
+
+func TestSubmitAllocation_TamperedCiphertextRejected(t *testing.T) {
+	sgn, _ := signer.NewFromHex("353c43dada1ebc390f9594ed91753446e19389ae545fc7fada020816346efb73", big.NewInt(114))
+	e := &Extension{signer: sgn, store: allocations.New(), reader: fakeReader{total: big.NewInt(10)}}
+	pool := common.Address{19: 1}
+	if status, _ := e.handleSubmitAllocation(context.Background(), pool, []byte("not a valid ecies ciphertext")); status != 0 {
+		t.Fatal("expected tampered/garbage ciphertext rejected")
+	}
+}
