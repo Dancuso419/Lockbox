@@ -13,7 +13,9 @@ import (
 	"extension-scaffold/internal/signer"
 	"extension-scaffold/pkg/types"
 
+	"github.com/ethereum/go-ethereum/accounts"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/instruction"
 	"github.com/flare-foundation/go-flare-common/pkg/tee/structs"
 	teetypes "github.com/flare-foundation/tee-node/pkg/types"
@@ -142,5 +144,51 @@ func resultErr(status uint8, data []byte) error {
 }
 
 func (e *Extension) processClaimVerify(action teetypes.Action, df *instruction.DataFixed) teetypes.ActionResult {
-	return buildResult(action, df, nil, 0, fmt.Errorf("not implemented"))
+	var msg types.ClaimVerifyMessage
+	if err := structs.DecodeTo(types.ClaimVerifyArg, df.OriginalMessage, &msg); err != nil {
+		return buildResult(action, df, nil, 0, fmt.Errorf("decoding message: %w", err))
+	}
+	status, data := e.handleClaimVerify(context.Background(), msg.Pool, msg.Payload)
+	return buildResult(action, df, data, status, resultErr(status, data))
+}
+
+func (e *Extension) handleClaimVerify(ctx context.Context, pool common.Address, payload []byte) (uint8, []byte) {
+	var req types.ClaimVerifyPayload
+	if err := json.Unmarshal(payload, &req); err != nil {
+		return 0, []byte("bad payload")
+	}
+	challenge := "ConfidentialPrizePool claim\npool:" + pool.Hex() + "\nkey:" + req.RecipientPubHex
+	sig := common.FromHex(req.ChallengeSig)
+	if len(sig) != 65 {
+		return 0, []byte("bad challenge sig")
+	}
+	rec := make([]byte, 65)
+	copy(rec, sig)
+	rec[64] -= 27
+	pub, err := crypto.SigToPub(accounts.TextHash([]byte(challenge)), rec)
+	if err != nil {
+		return 0, []byte("challenge recover failed")
+	}
+	recipient := crypto.PubkeyToAddress(*pub)
+
+	entry, ok := e.store.Lookup(pool, recipient)
+	if !ok {
+		return 0, []byte("not eligible")
+	}
+	vsig, err := e.signer.SignVoucher(pool, recipient, entry.Amount, entry.Nonce)
+	if err != nil {
+		return 0, []byte("sign failed")
+	}
+	voucher := struct {
+		Amount    string `json:"amount"`
+		Nonce     string `json:"nonce"`
+		Signature string `json:"signature"`
+	}{entry.Amount.String(), entry.Nonce.String(), "0x" + common.Bytes2Hex(vsig)}
+	vjson, _ := json.Marshal(voucher)
+	ct, err := signer.EncryptTo(req.RecipientPubHex, vjson)
+	if err != nil {
+		return 0, []byte("encrypt failed")
+	}
+	out, _ := json.Marshal(types.ClaimVerifyResult{Voucher: "0x" + common.Bytes2Hex(ct)})
+	return 1, out
 }

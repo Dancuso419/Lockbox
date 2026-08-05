@@ -102,3 +102,8 @@ func (s *Signer) Decrypt(ciphertext []byte) ([]byte, error) {
 	epriv := ecies.ImportECDSA(s.key)
 	return epriv.Decrypt(ciphertext, nil, nil)
 }
+
+// VoucherDigestForTest exposes the EIP-712 digest for tests/tools only.
+func (s *Signer) VoucherDigestForTest(pool, recipient common.Address, amount, nonce *big.Int) []byte {
+	return s.voucherDigest(pool, recipient, amount, nonce)
+}
