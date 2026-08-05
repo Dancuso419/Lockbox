@@ -1,6 +1,7 @@
 [profile.default]
 src = "contracts"
 out = "out"
+test = "test"
 libs = ["lib"]
 # TODO: Once flare-smart-contracts-v2 is published as a package, add it as a dependency
 # and restore the remapping:
