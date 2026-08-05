@@ -76,4 +76,80 @@ contract PoolTest is Test {
         assertEq(pool.remaining(), 7 ether);
         assertTrue(pool.usedNonce(1));
     }
+
+    function test_claim_replayReverts() public {
+        Pool pool = _deployNativePool(10 ether);
+        address recipient = address(0xBEEF);
+        bytes memory sig = _sign(pool, recipient, 3 ether, 1);
+        vm.prank(recipient);
+        pool.claim(3 ether, 1, sig);
+
+        vm.prank(recipient);
+        vm.expectRevert(Pool.NonceUsed.selector);
+        pool.claim(3 ether, 1, sig);
+    }
+
+    function test_claim_wrongSignerReverts() public {
+        Pool pool = _deployNativePool(10 ether);
+        address recipient = address(0xBEEF);
+        (, uint256 attackerPk) = makeAddrAndKey("attacker");
+        bytes32 structHash =
+            keccak256(abi.encode(pool.VOUCHER_TYPEHASH(), recipient, uint256(3 ether), uint256(1)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(attackerPk, _digest(pool, structHash));
+        bytes memory badSig = abi.encodePacked(r, s, v);
+
+        vm.prank(recipient);
+        vm.expectRevert(Pool.BadSignature.selector);
+        pool.claim(3 ether, 1, badSig);
+    }
+
+    function test_claim_stolenVoucherByOtherAddressReverts() public {
+        Pool pool = _deployNativePool(10 ether);
+        address recipient = address(0xBEEF);
+        bytes memory sig = _sign(pool, recipient, 3 ether, 1); // bound to 0xBEEF
+
+        address thief = address(0xBAD);
+        vm.prank(thief);
+        vm.expectRevert(Pool.BadSignature.selector); // digest uses msg.sender=thief
+        pool.claim(3 ether, 1, sig);
+    }
+
+    function test_claim_overAllocationReverts() public {
+        Pool pool = _deployNativePool(10 ether);
+        address r1 = makeAddr("r1");
+        address r2 = makeAddr("r2");
+        // Sign BEFORE pranking: _sign() calls pool.VOUCHER_TYPEHASH(), which would
+        // otherwise consume the prank and leave claim() with the wrong msg.sender.
+        bytes memory sig1 = _sign(pool, r1, 7 ether, 1);
+        bytes memory sig2 = _sign(pool, r2, 4 ether, 2);
+
+        vm.prank(r1);
+        pool.claim(7 ether, 1, sig1);
+
+        // second claim of 4 would exceed 10 total
+        vm.prank(r2);
+        vm.expectRevert(Pool.ExceedsDeposited.selector);
+        pool.claim(4 ether, 2, sig2);
+    }
+
+    function test_claim_afterDeadlineReverts() public {
+        Pool pool = _deployNativePool(10 ether);
+        address recipient = address(0xBEEF);
+        bytes memory sig = _sign(pool, recipient, 3 ether, 1);
+        vm.warp(deadline + 1);
+        vm.prank(recipient);
+        vm.expectRevert(Pool.PastDeadline.selector);
+        pool.claim(3 ether, 1, sig);
+    }
+
+    function test_claim_crossPoolVoucherReverts() public {
+        Pool poolA = _deployNativePool(10 ether);
+        Pool poolB = _deployNativePool(10 ether);
+        address recipient = address(0xBEEF);
+        bytes memory sigForA = _sign(poolA, recipient, 3 ether, 1);
+
+        vm.prank(recipient);
+        vm.expectRevert(Pool.BadSignature.selector); // poolB domain differs
+        poolB.claim(3 ether, 1, sigForA);
+    }
 }
