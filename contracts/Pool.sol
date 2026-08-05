@@ -33,6 +33,14 @@ contract Pool is EIP712, ReentrancyGuard {
     error ZeroAmount();
     error BadDeadline();
     error WrongNativeValue();
+    error NotOpen();
+    error PastDeadline();
+    error NonceUsed();
+    error BadSignature();
+    error ExceedsDeposited();
+    error NativeTransferFailed();
+
+    event Claimed(address indexed recipient, uint256 amount, uint256 nonce);
 
     constructor(
         address _organizer,
@@ -64,5 +72,38 @@ contract Pool is EIP712, ReentrancyGuard {
 
     function remaining() external view returns (uint256) {
         return totalDeposited - totalClaimed;
+    }
+
+    function claim(uint256 amount, uint256 nonce, bytes calldata signature)
+        external
+        nonReentrant
+    {
+        if (status != Status.Open) revert NotOpen();
+        if (block.timestamp > deadline) revert PastDeadline();
+        if (usedNonce[nonce]) revert NonceUsed();
+
+        bytes32 structHash =
+            keccak256(abi.encode(VOUCHER_TYPEHASH, msg.sender, amount, nonce));
+        bytes32 digest = _hashTypedDataV4(structHash);
+        if (ECDSA.recover(digest, signature) != authorizedSigner) revert BadSignature();
+
+        if (totalClaimed + amount > totalDeposited) revert ExceedsDeposited();
+
+        // effects
+        usedNonce[nonce] = true;
+        totalClaimed += amount;
+
+        // interaction
+        _payout(msg.sender, amount);
+        emit Claimed(msg.sender, amount, nonce);
+    }
+
+    function _payout(address to, uint256 amount) private {
+        if (asset == address(0)) {
+            (bool ok, ) = payable(to).call{value: amount}("");
+            if (!ok) revert NativeTransferFailed();
+        } else {
+            IERC20(asset).safeTransfer(to, amount);
+        }
     }
 }

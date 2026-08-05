@@ -34,4 +34,46 @@ contract PoolTest is Test {
         assertEq(address(pool).balance, 10 ether);
         assertEq(pool.remaining(), 10 ether);
     }
+
+    // EIP-712 digest matching Pool's domain; sign with signerPk.
+    function _sign(Pool pool, address recipient, uint256 amount, uint256 nonce)
+        internal view returns (bytes memory)
+    {
+        bytes32 structHash = keccak256(
+            abi.encode(pool.VOUCHER_TYPEHASH(), recipient, amount, nonce)
+        );
+        bytes32 digest = _digest(pool, structHash);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, digest);
+        return abi.encodePacked(r, s, v);
+    }
+
+    // Rebuild EIP-712 domain separator the way OZ EIP712 does.
+    function _digest(Pool pool, bytes32 structHash) internal view returns (bytes32) {
+        bytes32 domainSeparator = keccak256(
+            abi.encode(
+                keccak256(
+                    "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+                ),
+                keccak256(bytes("ConfidentialPrizePool")),
+                keccak256(bytes("1")),
+                block.chainid,
+                address(pool)
+            )
+        );
+        return keccak256(abi.encodePacked("\x19\x01", domainSeparator, structHash));
+    }
+
+    function test_claim_native_paysRecipientOnce() public {
+        Pool pool = _deployNativePool(10 ether);
+        address recipient = address(0xBEEF);
+        bytes memory sig = _sign(pool, recipient, 3 ether, 1);
+
+        vm.prank(recipient);
+        pool.claim(3 ether, 1, sig);
+
+        assertEq(recipient.balance, 3 ether);
+        assertEq(pool.totalClaimed(), 3 ether);
+        assertEq(pool.remaining(), 7 ether);
+        assertTrue(pool.usedNonce(1));
+    }
 }
