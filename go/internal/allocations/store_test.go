@@ -61,3 +61,20 @@ func TestLookup_IsolatesPools(t *testing.T) {
 		t.Fatal("lookup should not cross pools")
 	}
 }
+
+func TestTotals_SumsAndCounts(t *testing.T) {
+	s := New()
+	pool := addr(1)
+	_ = s.Submit(pool, []Input{
+		{Recipient: addr(0xA), Amount: big.NewInt(3)},
+		{Recipient: addr(0xB), Amount: big.NewInt(5)},
+	}, big.NewInt(10))
+
+	total, count, ok := s.Totals(pool)
+	if !ok || count != 2 || total.Cmp(big.NewInt(8)) != 0 {
+		t.Fatalf("Totals = (%v, %d, %v), want (8, 2, true)", total, count, ok)
+	}
+	if _, _, ok := s.Totals(addr(9)); ok {
+		t.Fatal("unknown pool should return ok=false")
+	}
+}

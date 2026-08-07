@@ -60,6 +60,21 @@ func (s *Store) Submit(pool common.Address, entries []Input, total *big.Int) err
 	return nil
 }
 
+// Totals returns the aggregate allocated amount and recipient count for a pool.
+func (s *Store) Totals(pool common.Address) (totalAllocated *big.Int, count int, ok bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	table, exists := s.pools[pool]
+	if !exists {
+		return nil, 0, false
+	}
+	sum := new(big.Int)
+	for _, e := range table {
+		sum.Add(sum, e.Amount)
+	}
+	return sum, len(table), true
+}
+
 func (s *Store) Lookup(pool, recipient common.Address) (Entry, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
