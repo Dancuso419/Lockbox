@@ -18,7 +18,8 @@ var (
 	domainTypehash  = crypto.Keccak256([]byte("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"))
 	nameHash        = crypto.Keccak256([]byte("ConfidentialPrizePool"))
 	versionHash     = crypto.Keccak256([]byte("1"))
-	voucherTypehash = crypto.Keccak256([]byte("Voucher(address recipient,uint256 amount,uint256 nonce)"))
+	voucherTypehash    = crypto.Keccak256([]byte("Voucher(address recipient,uint256 amount,uint256 nonce)"))
+	complianceTypehash = crypto.Keccak256([]byte("ComplianceReport(address pool,uint256 totalDeposited,uint256 totalAllocated,uint256 recipientCount)"))
 )
 
 type Signer struct {
@@ -106,4 +107,36 @@ func (s *Signer) Decrypt(ciphertext []byte) ([]byte, error) {
 // VoucherDigestForTest exposes the EIP-712 digest for tests/tools only.
 func (s *Signer) VoucherDigestForTest(pool, recipient common.Address, amount, nonce *big.Int) []byte {
 	return s.voucherDigest(pool, recipient, amount, nonce)
+}
+
+func (s *Signer) complianceDigest(pool common.Address, totalDeposited, totalAllocated, recipientCount *big.Int) []byte {
+	structEnc := make([]byte, 0, 160)
+	structEnc = append(structEnc, complianceTypehash...)
+	structEnc = append(structEnc, word(pool.Bytes())...)
+	structEnc = append(structEnc, word(totalDeposited.Bytes())...)
+	structEnc = append(structEnc, word(totalAllocated.Bytes())...)
+	structEnc = append(structEnc, word(recipientCount.Bytes())...)
+	structHash := crypto.Keccak256(structEnc)
+
+	pre := make([]byte, 0, 66)
+	pre = append(pre, 0x19, 0x01)
+	pre = append(pre, s.domainSeparator(pool)...)
+	pre = append(pre, structHash...)
+	return crypto.Keccak256(pre)
+}
+
+// SignComplianceReport signs the EIP-712 ComplianceReport; V normalized to 27/28.
+func (s *Signer) SignComplianceReport(pool common.Address, totalDeposited, totalAllocated, recipientCount *big.Int) ([]byte, error) {
+	digest := s.complianceDigest(pool, totalDeposited, totalAllocated, recipientCount)
+	sig, err := crypto.Sign(digest, s.key)
+	if err != nil {
+		return nil, err
+	}
+	sig[64] += 27
+	return sig, nil
+}
+
+// ComplianceDigestForTest exposes the digest for tests/tools only.
+func (s *Signer) ComplianceDigestForTest(pool common.Address, totalDeposited, totalAllocated, recipientCount *big.Int) []byte {
+	return s.complianceDigest(pool, totalDeposited, totalAllocated, recipientCount)
 }

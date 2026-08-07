@@ -79,3 +79,27 @@ func TestECIES_WrongKeyFails(t *testing.T) {
 		t.Fatal("expected decrypt with wrong key to fail")
 	}
 }
+
+func TestSignComplianceReport_RecoversToSignerAddress(t *testing.T) {
+	s, _ := NewFromHex(testKeyHex, big.NewInt(114))
+	pool := common.HexToAddress("0xB91c743E0c9FD6068f1833759a146E950312955B")
+	totalDeposited := big.NewInt(10)
+	totalAllocated := big.NewInt(8)
+	recipientCount := big.NewInt(3)
+
+	sig, err := s.SignComplianceReport(pool, totalDeposited, totalAllocated, recipientCount)
+	if err != nil {
+		t.Fatalf("SignComplianceReport: %v", err)
+	}
+	if len(sig) != 65 || (sig[64] != 27 && sig[64] != 28) {
+		t.Fatalf("bad sig: len=%d v=%d", len(sig), sig[64])
+	}
+	digest := s.ComplianceDigestForTest(pool, totalDeposited, totalAllocated, recipientCount)
+	rec, err := crypto.SigToPub(digest, sigWithV0(sig))
+	if err != nil {
+		t.Fatalf("SigToPub: %v", err)
+	}
+	if crypto.PubkeyToAddress(*rec) != s.Address() {
+		t.Fatal("compliance sig does not recover to signer address")
+	}
+}
