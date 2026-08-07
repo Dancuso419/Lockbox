@@ -247,6 +247,54 @@ contract PoolTest is Test {
         assertEq(good.balance, 3 ether);
         assertEq(pool.totalClaimed(), 3 ether);
     }
+
+    event ComplianceReported(uint256 totalDeposited, uint256 totalAllocated, uint256 recipientCount);
+
+    function _signCompliance(Pool pool, uint256 totalDeposited, uint256 totalAllocated, uint256 recipientCount)
+        internal view returns (bytes memory)
+    {
+        bytes32 structHash = keccak256(abi.encode(
+            pool.COMPLIANCE_TYPEHASH(), address(pool), totalDeposited, totalAllocated, recipientCount));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(signerPk, _digest(pool, structHash));
+        return abi.encodePacked(r, s, v);
+    }
+
+    function test_publishCompliance_validReportStored() public {
+        Pool pool = _deployNativePool(10 ether);
+        bytes memory sig = _signCompliance(pool, 10 ether, 8 ether, 3);
+        vm.expectEmit(false, false, false, true, address(pool));
+        emit ComplianceReported(10 ether, 8 ether, 3);
+        pool.publishComplianceReport(8 ether, 3, sig);
+        assertTrue(pool.complianceReported());
+        assertEq(pool.reportedTotalAllocated(), 8 ether);
+        assertEq(pool.reportedRecipientCount(), 3);
+    }
+
+    function test_publishCompliance_wrongSignerReverts() public {
+        Pool pool = _deployNativePool(10 ether);
+        (, uint256 attackerPk) = makeAddrAndKey("attacker");
+        bytes32 structHash = keccak256(abi.encode(
+            pool.COMPLIANCE_TYPEHASH(), address(pool), uint256(10 ether), uint256(8 ether), uint256(3)));
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(attackerPk, _digest(pool, structHash));
+        bytes memory bad = abi.encodePacked(r, s, v);
+        vm.expectRevert(Pool.BadSignature.selector);
+        pool.publishComplianceReport(8 ether, 3, bad);
+    }
+
+    function test_publishCompliance_overDepositReverts() public {
+        Pool pool = _deployNativePool(10 ether);
+        bytes memory sig = _signCompliance(pool, 10 ether, 11 ether, 3);
+        vm.expectRevert(Pool.ExceedsDeposited.selector);
+        pool.publishComplianceReport(11 ether, 3, sig);
+    }
+
+    function test_publishCompliance_secondPublishReverts() public {
+        Pool pool = _deployNativePool(10 ether);
+        bytes memory sig = _signCompliance(pool, 10 ether, 8 ether, 3);
+        pool.publishComplianceReport(8 ether, 3, sig);
+        vm.expectRevert(Pool.AlreadyReported.selector);
+        pool.publishComplianceReport(8 ether, 3, sig);
+    }
 }
 
 contract RevertingReceiver {

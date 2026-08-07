@@ -19,6 +19,10 @@ contract Pool is EIP712, ReentrancyGuard {
     bytes32 public constant VOUCHER_TYPEHASH =
         keccak256("Voucher(address recipient,uint256 amount,uint256 nonce)");
 
+    // keccak256("ComplianceReport(address pool,uint256 totalDeposited,uint256 totalAllocated,uint256 recipientCount)")
+    bytes32 public constant COMPLIANCE_TYPEHASH = keccak256(
+        "ComplianceReport(address pool,uint256 totalDeposited,uint256 totalAllocated,uint256 recipientCount)");
+
     address public immutable organizer;
     address public immutable asset; // address(0) == native
     uint256 public immutable totalDeposited;
@@ -29,6 +33,11 @@ contract Pool is EIP712, ReentrancyGuard {
     Status public status;
     mapping(uint256 => bool) public usedNonce;
 
+    bool public complianceReported;
+    uint256 public reportedTotalAllocated;
+    uint256 public reportedRecipientCount;
+
+    error AlreadyReported();
     error ZeroSigner();
     error ZeroAmount();
     error BadDeadline();
@@ -44,6 +53,7 @@ contract Pool is EIP712, ReentrancyGuard {
 
     event Claimed(address indexed recipient, uint256 amount, uint256 nonce);
     event Swept(address indexed organizer, uint256 amount);
+    event ComplianceReported(uint256 totalDeposited, uint256 totalAllocated, uint256 recipientCount);
 
     constructor(
         address _organizer,
@@ -111,6 +121,28 @@ contract Pool is EIP712, ReentrancyGuard {
         status = Status.Closed;
         _payout(organizer, amount);
         emit Swept(organizer, amount);
+    }
+
+    /// @notice Publish a TEE-signed attestation that `recipientCount` recipients were
+    /// allocated `totalAllocated` in aggregate, with `totalAllocated <= totalDeposited`.
+    /// No individual allocation data is revealed. Publishable once.
+    function publishComplianceReport(
+        uint256 totalAllocated,
+        uint256 recipientCount,
+        bytes calldata signature
+    ) external {
+        if (complianceReported) revert AlreadyReported();
+        if (totalAllocated > totalDeposited) revert ExceedsDeposited();
+
+        bytes32 structHash = keccak256(abi.encode(
+            COMPLIANCE_TYPEHASH, address(this), totalDeposited, totalAllocated, recipientCount));
+        bytes32 digest = _hashTypedDataV4(structHash);
+        if (ECDSA.recover(digest, signature) != authorizedSigner) revert BadSignature();
+
+        complianceReported = true;
+        reportedTotalAllocated = totalAllocated;
+        reportedRecipientCount = recipientCount;
+        emit ComplianceReported(totalDeposited, totalAllocated, recipientCount);
     }
 
     function _payout(address to, uint256 amount) private {
