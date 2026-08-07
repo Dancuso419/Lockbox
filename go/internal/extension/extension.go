@@ -91,6 +91,9 @@ func (e *Extension) processPrizePool(action teetypes.Action, df *instruction.Dat
 	case df.OPCommand == teeutils.ToHash(config.OPCommandClaimVerify):
 		b, _ := json.Marshal(e.processClaimVerify(action, df))
 		return http.StatusOK, b
+	case df.OPCommand == teeutils.ToHash(config.OPCommandComplianceReport):
+		b, _ := json.Marshal(e.processComplianceReport(action, df))
+		return http.StatusOK, b
 	default:
 		return http.StatusNotImplemented, []byte(fmt.Sprintf("unsupported op command: %s", df.OPCommand.Hex()))
 	}
@@ -150,6 +153,42 @@ func (e *Extension) processClaimVerify(action teetypes.Action, df *instruction.D
 	}
 	status, data := e.handleClaimVerify(context.Background(), msg.Pool, msg.Payload)
 	return buildResult(action, df, data, status, resultErr(status, data))
+}
+
+func (e *Extension) processComplianceReport(action teetypes.Action, df *instruction.DataFixed) teetypes.ActionResult {
+	var msg types.ComplianceReportMessage
+	if err := structs.DecodeTo(types.ComplianceReportArg, df.OriginalMessage, &msg); err != nil {
+		return buildResult(action, df, nil, 0, fmt.Errorf("decoding message: %w", err))
+	}
+	status, data := e.handleComplianceReport(context.Background(), msg.Pool)
+	return buildResult(action, df, data, status, resultErr(status, data))
+}
+
+// handleComplianceReport computes the aggregate from the private store, reads the
+// on-chain deposit, and returns a TEE-signed attestation. No line items.
+func (e *Extension) handleComplianceReport(ctx context.Context, pool common.Address) (uint8, []byte) {
+	totalAllocated, count, ok := e.store.Totals(pool)
+	if !ok {
+		return 0, []byte("no allocations for pool")
+	}
+	totalDeposited, err := e.reader.TotalDeposited(ctx, pool)
+	if err != nil {
+		return 0, []byte("deposit read failed")
+	}
+	if totalAllocated.Cmp(totalDeposited) > 0 {
+		return 0, []byte("allocation exceeds deposit")
+	}
+	recipientCount := big.NewInt(int64(count))
+	sig, err := e.signer.SignComplianceReport(pool, totalDeposited, totalAllocated, recipientCount)
+	if err != nil {
+		return 0, []byte("sign failed")
+	}
+	out, _ := json.Marshal(types.ComplianceReportResult{
+		TotalAllocated: totalAllocated.String(),
+		RecipientCount: count,
+		Signature:      "0x" + common.Bytes2Hex(sig),
+	})
+	return 1, out
 }
 
 func (e *Extension) handleClaimVerify(ctx context.Context, pool common.Address, payload []byte) (uint8, []byte) {
