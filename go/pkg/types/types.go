@@ -18,6 +18,17 @@ type ClaimVerifyMessage struct {
 	Pool    common.Address
 }
 
+// ComplianceReportMessage is the ABI payload from sendComplianceReport.
+type ComplianceReportMessage struct {
+	Pool common.Address
+}
+
+type ComplianceReportResult struct {
+	TotalAllocated string `json:"totalAllocated"`
+	RecipientCount int    `json:"recipientCount"`
+	Signature      string `json:"signature"`
+}
+
 // AllocationTable is the decrypted SUBMIT_ALLOCATION plaintext.
 type AllocationTable struct {
 	Allocations []AllocationItem `json:"allocations"`
@@ -48,8 +59,9 @@ type State struct {
 }
 
 var (
-	SubmitAllocationArg abi.Argument
-	ClaimVerifyArg      abi.Argument
+	SubmitAllocationArg  abi.Argument
+	ClaimVerifyArg       abi.Argument
+	ComplianceReportArg  abi.Argument
 )
 
 func init() {
@@ -64,6 +76,11 @@ func init() {
 		{Name: "pool", Type: "address"},
 	})
 	ClaimVerifyArg = abi.Argument{Type: cvTy}
+
+	crTy, _ := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
+		{Name: "pool", Type: "address"},
+	})
+	ComplianceReportArg = abi.Argument{Type: crTy}
 }
 
 // --- DO NOT MODIFY below this line. ---

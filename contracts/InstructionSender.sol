@@ -23,6 +23,10 @@ contract PrizePoolInstructionSender {
     // forge-lint: disable-next-line(unsafe-typecast)
     bytes32 public constant OP_COMMAND_CLAIM_VERIFY = bytes32("CLAIM_VERIFY");
 
+    /// @notice Command for the COMPLIANCE_REPORT action.
+    // forge-lint: disable-next-line(unsafe-typecast)
+    bytes32 public constant OP_COMMAND_COMPLIANCE_REPORT = bytes32("COMPLIANCE_REPORT");
+
     /// @notice Reference to the TEE extension registry contract.
     ITeeExtensionRegistry public immutable TEE_EXTENSION_REGISTRY;
     /// @notice Reference to the TEE machine registry contract.
@@ -36,6 +40,7 @@ contract PrizePoolInstructionSender {
 
     struct SubmitAllocationMessage { bytes ciphertext; address pool; }
     struct ClaimVerifyMessage { bytes payload; address pool; }
+    struct ComplianceReportMessage { address pool; }
 
     /// @notice Initializes the contract with registry addresses.
     /// @param _teeExtensionRegistry Address of the TEE extension registry.
@@ -90,6 +95,21 @@ contract PrizePoolInstructionSender {
             opType: OP_TYPE_PRIZEPOOL,
             opCommand: OP_COMMAND_CLAIM_VERIFY,
             message: abi.encode(ClaimVerifyMessage({payload: payload, pool: pool})),
+            cosigners: cosigners,
+            cosignersThreshold: 0,
+            claimBackAddress: msg.sender
+        });
+        TEE_EXTENSION_REGISTRY.sendInstructions{value: msg.value}(teeIds, params);
+    }
+
+    /// @notice Ask the TEE to produce a signed compliance attestation for `pool`.
+    function sendComplianceReport(address pool) external payable {
+        address[] memory teeIds = TEE_MACHINE_REGISTRY.getRandomTeeIds(_getExtensionId(), 1);
+        address[] memory cosigners = new address[](0);
+        ITeeExtensionRegistry.TeeInstructionParams memory params = ITeeExtensionRegistry.TeeInstructionParams({
+            opType: OP_TYPE_PRIZEPOOL,
+            opCommand: OP_COMMAND_COMPLIANCE_REPORT,
+            message: abi.encode(ComplianceReportMessage({pool: pool})),
             cosigners: cosigners,
             cosignersThreshold: 0,
             claimBackAddress: msg.sender
