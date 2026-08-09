@@ -201,16 +201,16 @@ export default function CreatePoolForm({ onPoolCreated }: Props) {
   return (
     <div className="space-y-4">
       {wrongChain && (
-        <div className="rounded-md bg-yellow-50 border border-yellow-200 px-4 py-3 flex items-center justify-between gap-3">
-          <span className="text-sm text-yellow-800">Wrong network — switch to Coston2.</span>
-          <Button size="sm" variant="outline" className="border-yellow-400 text-yellow-700 hover:bg-yellow-100 shrink-0"
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3">
+          <span className="text-sm text-warning">Wrong network — switch to Coston2.</span>
+          <Button size="sm" variant="outline" className="shrink-0 border-warning/40 text-warning hover:bg-warning/15"
             onClick={() => switchChain({ chainId: CONFIG.chainId })}>Switch</Button>
         </div>
       )}
 
       {/* Asset type */}
       <div className="space-y-1">
-        <label className="text-sm font-medium text-gray-700">Asset</label>
+        <label className="text-sm font-medium text-foreground">Asset</label>
         <div className="flex gap-4 text-sm">
           <label className="flex items-center gap-2 cursor-pointer">
             <input type="radio" checked={assetType === "native"} onChange={() => setAssetType("native")} />
@@ -226,14 +226,14 @@ export default function CreatePoolForm({ onPoolCreated }: Props) {
             <Input placeholder="Token address (0x…)" value={tokenAddress}
               onChange={(e) => { setTokenAddress(e.target.value); setTokenAddressError(""); }}
               className="font-mono text-sm" />
-            {tokenAddressError && <p className="text-xs text-red-600">{tokenAddressError}</p>}
+            {tokenAddressError && <p className="text-xs text-destructive">{tokenAddressError}</p>}
           </div>
         )}
       </div>
 
       {/* Total amount */}
       <div className="space-y-1">
-        <label className="text-sm font-medium text-gray-700">Total amount</label>
+        <label className="text-sm font-medium text-foreground">Total amount</label>
         <Input placeholder={assetType === "native" ? "e.g. 1.5 (C2FLR)" : "e.g. 1.5 (token units)"}
           value={total} onChange={(e) => { setTotal(e.target.value); setTotalError(""); }}
           className="font-mono text-sm" />
@@ -242,38 +242,37 @@ export default function CreatePoolForm({ onPoolCreated }: Props) {
             ? "Parsed as 18-decimal C2FLR (e.g. 1.5 = 1.5 C2FLR)."
             : "Parsed using the token's decimals() (fetched on submit). Enter a human-readable amount."}
         </p>
-        {totalError && <p className="text-xs text-red-600">{totalError}</p>}
+        {totalError && <p className="text-xs text-destructive">{totalError}</p>}
       </div>
 
       {/* Deadline */}
       <div className="space-y-1">
-        <label className="text-sm font-medium text-gray-700">Deadline</label>
+        <label className="text-sm font-medium text-foreground">Deadline</label>
         <Input type="datetime-local" value={deadline}
           onChange={(e) => { setDeadline(e.target.value); setDeadlineError(""); }}
           className="text-sm" />
-        {deadlineError && <p className="text-xs text-red-600">{deadlineError}</p>}
+        {deadlineError && <p className="text-xs text-destructive">{deadlineError}</p>}
       </div>
 
       {/* Authorized signer (auto-filled from TEE) */}
       <div className="space-y-1">
-        <label className="text-sm font-medium text-gray-700">Authorized signer <span className="text-muted-foreground font-normal">(TEE, read-only)</span></label>
+        <label className="text-sm font-medium text-foreground">Authorized signer <span className="text-muted-foreground font-normal">(TEE, read-only)</span></label>
         {signerLoading && <p className="text-xs text-muted-foreground animate-pulse">Fetching from TEE…</p>}
-        {signerFailed && <p className="text-xs text-red-600">Failed to fetch TEE signer. BFF may be offline.</p>}
+        {signerFailed && <p className="text-xs text-destructive">Failed to fetch TEE signer. BFF may be offline.</p>}
         {signerAddress && (
-          <Input value={signerAddress} readOnly className="font-mono text-sm bg-gray-50" />
+          <Input value={signerAddress} readOnly className="bg-muted font-mono text-sm" />
         )}
       </div>
 
-      <Button onClick={handleSubmit} disabled={submitting || wrongChain || signerLoading}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+      <Button onClick={handleSubmit} disabled={submitting || wrongChain || signerLoading} className="w-full">
         {submitting ? "Creating pool…" : "Create pool"}
       </Button>
 
       {createdPool && (
-        <div className="rounded-md bg-green-50 border border-green-200 p-3 text-sm space-y-1">
-          <p className="font-medium text-green-800">Pool created</p>
+        <div className="space-y-1 rounded-lg border border-success/25 bg-success/10 p-3 text-sm">
+          <p className="font-medium text-success">Pool created</p>
           <a href={`${CONFIG.explorer}/address/${createdPool}`} target="_blank" rel="noopener noreferrer"
-            className="font-mono text-blue-600 hover:underline break-all text-xs">{createdPool}</a>
+            className="break-all font-mono text-xs text-glow hover:underline">{createdPool}</a>
         </div>
       )}
     </div>

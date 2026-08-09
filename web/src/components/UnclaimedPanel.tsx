@@ -104,26 +104,25 @@ export default function UnclaimedPanel({ pool, decimals = 18, asset }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-700">
+      <div className="rounded-lg border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
         Both actions require the pool deadline to have passed — the contract enforces this and
         will revert otherwise. Your wallet must be the pool organizer.
       </div>
 
-      <Button onClick={handleReveal} disabled={revealing || !isConnected}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+      <Button onClick={handleReveal} disabled={revealing || !isConnected} className="w-full">
         {revealing ? "Decrypting…" : "Reveal non-claimants"}
       </Button>
 
       {rows !== null && (
         rows.length === 0 ? (
-          <p className="text-sm text-green-700">All recipients have claimed.</p>
+          <p className="text-sm text-success">All recipients have claimed.</p>
         ) : (
           <div className="rounded-md border overflow-hidden">
-            <p className="text-xs text-muted-foreground px-3 py-2 bg-gray-50 border-b">
+            <p className="text-xs text-muted-foreground px-3 py-2 bg-muted border-b">
               {rows.length} unclaimed allocation(s) — visible only in your browser
             </p>
             <table className="w-full text-xs">
-              <thead className="bg-gray-50 text-muted-foreground">
+              <thead className="bg-muted text-muted-foreground">
                 <tr>
                   <th className="text-left px-3 py-2">Recipient</th>
                   <th className="text-right px-3 py-2">Amount ({ticker})</th>
@@ -134,11 +133,11 @@ export default function UnclaimedPanel({ pool, decimals = 18, asset }: Props) {
                   <tr key={i} className="border-t">
                     <td className="px-3 py-1.5 font-mono">
                       <a href={`${CONFIG.explorer}/address/${r.recipient}`} target="_blank"
-                        rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                        rel="noopener noreferrer" className="text-glow hover:underline">
                         {r.recipient.slice(0, 8)}…{r.recipient.slice(-6)}
                       </a>
                     </td>
-                    <td className="px-3 py-1.5 tabular-nums text-right text-gray-700">
+                    <td className="px-3 py-1.5 text-right tabular-nums text-foreground">
                       {formatUnits(BigInt(r.amount), decimals)}
                     </td>
                   </tr>
@@ -151,14 +150,14 @@ export default function UnclaimedPanel({ pool, decimals = 18, asset }: Props) {
 
       <div className="border-t pt-4">
         <Button onClick={handleSweep} disabled={sweeping || !isConnected} variant="outline"
-          className="w-full border-gray-300">
+          className="w-full">
           {sweeping ? "Sweeping…" : "Sweep remaining funds"}
         </Button>
         {sweepHash && (
-          <p className="mt-2 text-xs text-green-700">
+          <p className="mt-2 text-xs text-success">
             Swept:{" "}
             <a href={`${CONFIG.explorer}/tx/${sweepHash}`} target="_blank" rel="noopener noreferrer"
-              className="font-mono text-blue-600 hover:underline break-all">{sweepHash}</a>
+              className="font-mono text-glow hover:underline break-all">{sweepHash}</a>
           </p>
         )}
       </div>

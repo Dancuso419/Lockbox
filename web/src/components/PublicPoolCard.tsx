@@ -155,9 +155,9 @@ export default function PublicPoolCard({ address }: Props) {
 
   if (error) {
     return (
-      <Card className="border-red-200">
+      <Card className="border-destructive/30">
         <CardContent className="pt-6">
-          <p className="text-red-600 text-sm">{error}</p>
+          <p className="text-sm text-destructive">{error}</p>
         </CardContent>
       </Card>
     );
@@ -177,14 +177,14 @@ export default function PublicPoolCard({ address }: Props) {
   const ticker = state.asset === ZERO_ADDR ? "C2FLR" : "tokens";
 
   return (
-    <Card className="bg-white shadow-sm">
+    <Card>
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-medium flex items-center gap-2 flex-wrap">
           <a
             href={`${CONFIG.explorer}/address/${address}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-mono text-blue-600 hover:underline text-sm break-all"
+            className="font-mono text-glow hover:underline text-sm break-all"
           >
             {address}
           </a>
@@ -198,26 +198,26 @@ export default function PublicPoolCard({ address }: Props) {
         {/* Pool metadata */}
         <div className="grid grid-cols-2 gap-2 text-muted-foreground">
           <span>Asset</span>
-          <span className="font-mono text-xs break-all text-gray-700">
+          <span className="font-mono text-xs break-all text-foreground">
             {state.asset === ZERO_ADDR ? "Native (C2FLR)" : state.asset}
           </span>
 
           <span>Deadline</span>
-          <span className="tabular-nums text-gray-700">{fmtDeadline(state.deadline)}</span>
+          <span className="tabular-nums text-foreground">{fmtDeadline(state.deadline)}</span>
 
           <span>Organizer</span>
           <a
             href={`${CONFIG.explorer}/address/${state.organizer}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-mono text-xs text-blue-600 hover:underline break-all"
+            className="font-mono text-xs text-glow hover:underline break-all"
           >
             {state.organizer}
           </a>
         </div>
 
         {/* Amounts */}
-        <div className="rounded-md border bg-gray-50 p-3 space-y-1">
+        <div className="rounded-md border bg-muted p-3 space-y-1">
           <Row label="Total deposited" value={`${fmtAmount(state.totalDeposited, decimals)} ${ticker}`} />
           <Row label="Total claimed"   value={`${fmtAmount(state.totalClaimed, decimals)} ${ticker}`} />
           <Row label="Remaining"       value={`${fmtAmount(remaining, decimals)} ${ticker}`} accent />
@@ -227,19 +227,20 @@ export default function PublicPoolCard({ address }: Props) {
         {state.complianceReported && (
           <div className="rounded-md border p-3 space-y-2">
             <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-medium text-gray-800">Compliance Report</span>
+              <span className="font-medium text-foreground">Compliance Report</span>
               {complianceOk === true && (
-                <Badge className="bg-green-100 text-green-800 border-green-200">Compliance verified ✓</Badge>
+                <Badge variant="success">Compliance verified ✓</Badge>
               )}
               {complianceOk === false && (
-                <Badge className="bg-red-100 text-red-800 border-red-200">✗ invalid signature</Badge>
+                <Badge variant="destructive">✗ invalid signature</Badge>
               )}
             </div>
             <Row label="Reported recipients"      value={state.reportedRecipientCount.toString()} />
             <Row label="Reported total allocated" value={`${fmtAmount(state.reportedTotalAllocated, decimals)} ${ticker}`} />
             {/* Per-recipient amounts are never on-chain — this is intentional */}
-            <div className="mt-1 rounded bg-blue-50 border border-blue-100 px-3 py-2 text-xs text-blue-700">
-              Individual allocations: <strong>hidden</strong> — amounts are processed inside the TEE and never written on-chain.
+            <div className="mt-1 flex items-center gap-2 rounded-md border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+              <span className="text-glow">◍</span>
+              Individual allocations: <strong className="text-foreground">hidden</strong> — sealed in the TEE, never written on-chain.
             </div>
           </div>
         )}
@@ -247,10 +248,10 @@ export default function PublicPoolCard({ address }: Props) {
         {/* Claimed events */}
         {claimedLogs.length > 0 && (
           <div>
-            <p className="font-medium text-gray-800 mb-1">Recent claims ({claimedLogs.length})</p>
+            <p className="font-medium text-foreground mb-1">Recent claims ({claimedLogs.length})</p>
             <div className="rounded-md border overflow-hidden">
               <table className="w-full text-xs">
-                <thead className="bg-gray-50 text-muted-foreground">
+                <thead className="bg-muted text-muted-foreground">
                   <tr>
                     <th className="text-left px-3 py-2">Recipient</th>
                     <th className="text-right px-3 py-2">Amount</th>
@@ -264,12 +265,12 @@ export default function PublicPoolCard({ address }: Props) {
                           href={`${CONFIG.explorer}/address/${l.recipient}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="font-mono text-blue-600 hover:underline"
+                          className="font-mono text-glow hover:underline"
                         >
                           {l.recipient.slice(0, 8)}…{l.recipient.slice(-6)}
                         </a>
                       </td>
-                      <td className="px-3 py-1.5 tabular-nums text-right text-gray-700">
+                      <td className="px-3 py-1.5 tabular-nums text-right text-foreground">
                         {fmtAmount(l.amount, decimals)}
                       </td>
                     </tr>
@@ -288,7 +289,7 @@ function Row({ label, value, accent }: { label: string; value: string; accent?: 
   return (
     <div className="flex justify-between gap-2">
       <span className="text-muted-foreground">{label}</span>
-      <span className={`tabular-nums font-mono text-xs ${accent ? "font-semibold text-blue-700" : "text-gray-700"}`}>
+      <span className={`font-mono text-xs tabular-nums ${accent ? "font-semibold text-foreground" : "text-foreground"}`}>
         {value}
       </span>
     </div>

@@ -204,12 +204,12 @@ export default function ClaimForm() {
     <div className="space-y-4">
       {/* Network warning */}
       {wrongChain && (
-        <div className="rounded-md bg-yellow-50 border border-yellow-200 px-4 py-3 flex items-center justify-between gap-3">
-          <span className="text-sm text-yellow-800">Wrong network — switch to Coston2 to proceed.</span>
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-warning/30 bg-warning/10 px-4 py-3">
+          <span className="text-sm text-warning">Wrong network — switch to Coston2 to proceed.</span>
           <Button
             size="sm"
             variant="outline"
-            className="border-yellow-400 text-yellow-700 hover:bg-yellow-100 shrink-0"
+            className="shrink-0 border-warning/40 text-warning hover:bg-warning/15"
             onClick={() => switchChain({ chainId: CONFIG.chainId })}
           >
             Switch
@@ -219,19 +219,19 @@ export default function ClaimForm() {
 
       {/* Pool address input */}
       <div className="space-y-1">
-        <label className="text-sm font-medium text-gray-700">Pool address</label>
+        <label className="text-sm font-medium text-foreground">Pool address</label>
         <Input
           placeholder="0x…"
           value={pool}
           onChange={(e) => { setPool(e.target.value); setPoolError(""); setVoucher(null); setTxHash(null); }}
           className="font-mono text-sm"
         />
-        {poolError && <p className="text-xs text-red-600">{poolError}</p>}
+        {poolError && <p className="text-xs text-destructive">{poolError}</p>}
       </div>
 
       {/* Fresh address toggle */}
       <div className="space-y-2">
-        <label className="flex items-center gap-2 cursor-pointer select-none text-sm text-gray-700">
+        <label className="flex cursor-pointer select-none items-center gap-2 text-sm text-foreground">
           <input
             type="checkbox"
             className="rounded"
@@ -253,8 +253,8 @@ export default function ClaimForm() {
               onChange={(e) => { setClaimAddress(e.target.value); setClaimAddressError(""); }}
               className="font-mono text-sm"
             />
-            {claimAddressError && <p className="text-xs text-red-600">{claimAddressError}</p>}
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+            {claimAddressError && <p className="text-xs text-destructive">{claimAddressError}</p>}
+            <p className="rounded border border-warning/25 bg-warning/10 px-2 py-1 text-xs text-warning">
               The TEE will route your prize to this address. To achieve full unlinkability,
               switch to that fresh wallet account before clicking "Claim on-chain" below —
               otherwise the transaction will be sent from your connected wallet{" "}
@@ -268,25 +268,25 @@ export default function ClaimForm() {
       <Button
         onClick={handleGetPrize}
         disabled={verifying || wrongChain}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+        className="w-full"
       >
         {verifying ? "Verifying with TEE…" : "Get my prize"}
       </Button>
 
       {/* Voucher result */}
       {voucher && (
-        <div className="rounded-md border bg-green-50 border-green-200 p-4 space-y-3">
+        <div className="space-y-3 rounded-lg border border-success/25 bg-success/10 p-4">
           <div className="flex items-center gap-2">
-            <Badge className="bg-green-100 text-green-800 border-green-200">Eligible</Badge>
-            <span className="text-sm text-gray-700">Your allocation:</span>
-            <span className="tabular-nums font-mono font-semibold text-blue-700">
+            <Badge className="border-success/30 bg-success/15 text-success">Eligible</Badge>
+            <span className="text-sm text-muted-foreground">Your allocation:</span>
+            <span className="font-mono text-lg font-semibold tabular-nums text-foreground">
               {formatUnits(BigInt(voucher.amount), decimals)} {ticker}
             </span>
           </div>
 
           {/* Fresh-address unlinkability reminder at claim time */}
           {freshToggle && (
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">
+            <p className="rounded border border-warning/25 bg-warning/10 px-2 py-1 text-xs text-warning">
               Remember: switch your wallet to{" "}
               <span className="font-mono">{claimAddress.slice(0, 8)}…</span> before
               submitting the on-chain transaction for unlinkability.
@@ -296,19 +296,19 @@ export default function ClaimForm() {
           <Button
             onClick={handleClaimOnChain}
             disabled={claiming}
-            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            className="w-full"
           >
             {claiming ? "Submitting…" : "Claim on-chain"}
           </Button>
 
           {txHash && (
-            <p className="text-xs text-green-700">
+            <p className="text-xs text-success">
               Transaction submitted:{" "}
               <a
                 href={`${CONFIG.explorer}/tx/${txHash}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-mono text-blue-600 hover:underline break-all"
+                className="break-all font-mono text-glow hover:underline"
               >
                 {txHash}
               </a>
@@ -328,7 +328,7 @@ export default function ClaimForm() {
               href={`${CONFIG.explorer}/address/${asset}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-mono text-blue-600 hover:underline"
+              className="font-mono text-glow hover:underline"
             >
               {asset}
             </a>

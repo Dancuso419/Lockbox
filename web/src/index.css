@@ -1,46 +1,102 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+  KEYHOLE design system — monochrome, private-members-club stance.
+  Light = inverted near-white; Dark (default) = drenched near-black.
+  Single restrained accent: a warm "keyhole glow" (the chandelier light
+  seen through the keyhole in the reference). State colors stay desaturated.
+*/
+
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --radius: 0.75rem;
+
+  /* Light mode — near-white paper, near-black ink */
+  --background: oklch(0.985 0.002 90);
+  --foreground: oklch(0.16 0.004 90);
+
+  --surface: oklch(1 0 0);
+  --surface-2: oklch(0.965 0.003 90);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.16 0.004 90);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.5 0.2 260);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.5 0.2 260);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --popover-foreground: oklch(0.16 0.004 90);
+
+  /* Primary = ink (monochrome buttons). */
+  --primary: oklch(0.18 0.004 90);
+  --primary-foreground: oklch(0.985 0.002 90);
+  --secondary: oklch(0.955 0.003 90);
+  --secondary-foreground: oklch(0.2 0.004 90);
+
+  --muted: oklch(0.955 0.003 90);
+  --muted-foreground: oklch(0.44 0.006 90);
+
+  --accent: oklch(0.955 0.003 90);
+  --accent-foreground: oklch(0.2 0.004 90);
+
+  /* Warm keyhole glow — the one accent. */
+  --glow: oklch(0.78 0.13 75);
+  --glow-strong: oklch(0.72 0.15 68);
+  --glow-foreground: oklch(0.2 0.05 70);
+
+  --success: oklch(0.55 0.09 155);
+  --warning: oklch(0.68 0.11 75);
+  --destructive: oklch(0.55 0.19 27);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --border: oklch(0.9 0.003 90);
+  --border-strong: oklch(0.82 0.004 90);
+  --input: oklch(0.9 0.003 90);
+  --ring: oklch(0.72 0.13 72);
+}
+
+.dark {
+  /* Dark mode (default) — drenched near-black, ZENTRA/Vercel monochrome */
+  --background: oklch(0.145 0.003 260);
+  --foreground: oklch(0.955 0.002 90);
+
+  --surface: oklch(0.185 0.003 260);
+  --surface-2: oklch(0.215 0.004 260);
+  --card: oklch(0.185 0.003 260);
+  --card-foreground: oklch(0.955 0.002 90);
+  --popover: oklch(0.185 0.003 260);
+  --popover-foreground: oklch(0.955 0.002 90);
+
+  --primary: oklch(0.96 0.002 90);
+  --primary-foreground: oklch(0.16 0.003 260);
+  --secondary: oklch(0.24 0.004 260);
+  --secondary-foreground: oklch(0.955 0.002 90);
+
+  --muted: oklch(0.24 0.004 260);
+  --muted-foreground: oklch(0.68 0.006 260);
+
+  --accent: oklch(0.26 0.005 260);
+  --accent-foreground: oklch(0.955 0.002 90);
+
+  --glow: oklch(0.82 0.13 78);
+  --glow-strong: oklch(0.86 0.14 80);
+  --glow-foreground: oklch(0.18 0.04 70);
+
+  --success: oklch(0.72 0.13 158);
+  --warning: oklch(0.8 0.12 82);
+  --destructive: oklch(0.62 0.19 25);
+  --destructive-foreground: oklch(0.985 0 0);
+
+  --border: oklch(1 0 0 / 10%);
+  --border-strong: oklch(1 0 0 / 18%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.82 0.13 78);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
@@ -53,32 +109,100 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-glow: var(--glow);
+  --color-glow-strong: var(--glow-strong);
+  --color-glow-foreground: var(--glow-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
+
+  --font-sans: "Geist Variable", system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", monospace;
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
+  --radius-xl: calc(var(--radius) + 6px);
+
+  /* Semantic z-scale */
+  --z-dropdown: 1000;
+  --z-sticky: 1100;
+  --z-backdrop: 1200;
+  --z-modal: 1300;
+  --z-toast: 1400;
+  --z-tooltip: 1500;
+
+  --ease-out-quint: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-body {
-  background-color: var(--background);
-  color: var(--foreground);
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
-  margin: 0;
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-feature-settings: "cv01", "ss01";
+    margin: 0;
+    min-height: 100vh;
+  }
+  ::selection {
+    background: var(--glow);
+    color: var(--glow-foreground);
+  }
+  h1, h2, h3 {
+    text-wrap: balance;
+    letter-spacing: -0.02em;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  input[type="checkbox"],
+  input[type="radio"] {
+    accent-color: var(--glow-strong);
+  }
+}
+
+/* Warm volumetric keyhole glow used behind the hero + section accents. */
+.glow-radial {
+  background: radial-gradient(
+    ellipse 60% 50% at 50% 40%,
+    color-mix(in oklch, var(--glow) 26%, transparent),
+    transparent 70%
+  );
+}
+
+/* Subtle film grain to keep large dark fields from banding. */
+.grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

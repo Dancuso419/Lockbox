@@ -63,10 +63,14 @@ export default function Organizer() {
   const poolValid = selectedPool && isAddress(selectedPool);
 
   return (
-    <div className="container mx-auto max-w-3xl px-4 py-8 space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Organizer</h1>
-        <p className="text-sm text-muted-foreground mt-1">Create a pool, submit allocations, publish compliance, and manage unclaimed funds.</p>
+    <div className="mx-auto max-w-3xl space-y-6 px-6 py-14">
+      <div className="mb-2">
+        <p className="font-mono text-xs uppercase tracking-widest text-glow">Organizer</p>
+        <h1 className="mt-2 text-3xl font-medium tracking-tight">Run a confidential pool</h1>
+        <p className="mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground">
+          Fund once, allocate privately inside the TEE, attest the split on-chain, and reveal only
+          the non-claimants to yourself after the deadline.
+        </p>
       </div>
 
       {/* Step 1 — Create pool */}
@@ -96,7 +100,7 @@ export default function Organizer() {
               className="font-mono text-sm"
             />
             <button
-              className="px-4 py-2 rounded-md border text-sm bg-white hover:bg-gray-50 shrink-0 disabled:opacity-40"
+              className="shrink-0 rounded-full border border-border-strong px-4 py-2 text-sm transition-colors hover:bg-accent disabled:opacity-40"
               disabled={!isAddress(poolInput)}
               onClick={() => {
                 if (isAddress(poolInput)) applyPool(poolInput as `0x${string}`);
@@ -107,7 +111,7 @@ export default function Organizer() {
           </div>
           {selectedPool && (
             <p className="text-xs text-muted-foreground font-mono break-all">
-              Active pool: <span className="text-gray-900">{selectedPool}</span>
+              Active pool: <span className="text-foreground">{selectedPool}</span>
             </p>
           )}
         </CardContent>

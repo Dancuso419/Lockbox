@@ -100,7 +100,7 @@ export default function AllocationForm({ pool }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-700">
+      <div className="rounded-lg border border-warning/25 bg-warning/10 px-3 py-2 text-xs text-warning">
         Amounts must be in <strong>base units</strong> (e.g. 6 decimals for FXRP, 18 for native C2FLR).
         Do not enter human-readable amounts — the TEE allocates exactly what you enter.
       </div>
@@ -127,7 +127,7 @@ export default function AllocationForm({ pool }: Props) {
                     onChange={(e) => updateRow(i, "amount", e.target.value)} />
                 </td>
                 <td className="pb-1">
-                  <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700 px-1"
+                  <Button size="sm" variant="ghost" className="px-1 text-destructive hover:text-destructive/80"
                     onClick={() => removeRow(i)} disabled={rows.length === 1}>×</Button>
                 </td>
               </tr>
@@ -139,14 +139,14 @@ export default function AllocationForm({ pool }: Props) {
       <Button variant="outline" size="sm" onClick={addRow}>+ Add row</Button>
 
       {errors.length > 0 && (
-        <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700 space-y-0.5">
+        <div className="space-y-0.5 rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           {errors.map((e, i) => <p key={i}>{e}</p>)}
         </div>
       )}
 
       {/* CSV paste */}
       <details className="group">
-        <summary className="cursor-pointer text-sm text-blue-600 hover:underline select-none">
+        <summary className="cursor-pointer select-none text-sm text-glow hover:underline">
           Paste CSV (addr,amount per line)
         </summary>
         <div className="mt-2 space-y-2">
@@ -162,12 +162,12 @@ export default function AllocationForm({ pool }: Props) {
         </div>
       </details>
 
-      <Button onClick={handleSubmit} disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+      <Button onClick={handleSubmit} disabled={submitting} className="w-full">
         {submitting ? "Encrypting & submitting…" : "Submit allocation"}
       </Button>
 
       {submittedCount !== null && (
-        <div className="rounded-md bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-800">
+        <div className="rounded-lg border border-success/25 bg-success/10 px-3 py-2 text-sm text-success">
           TEE confirmed <strong>{submittedCount}</strong> recipient(s) allocated.
         </div>
       )}

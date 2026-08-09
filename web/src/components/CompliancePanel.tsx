@@ -48,22 +48,21 @@ export default function CompliancePanel({ pool }: Props) {
         The pool must have allocations submitted before this can succeed.
       </p>
 
-      <Button onClick={handlePublish} disabled={loading}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+      <Button onClick={handlePublish} disabled={loading} className="w-full">
         {loading ? "Fetching report & publishing…" : "Publish compliance report"}
       </Button>
 
       {result && (
-        <div className="rounded-md bg-green-50 border border-green-200 p-3 text-sm space-y-2">
-          <p className="font-medium text-green-800">Compliance report published</p>
-          <div className="grid grid-cols-2 gap-1 text-xs text-gray-700">
+        <div className="space-y-2 rounded-lg border border-success/25 bg-success/10 p-3 text-sm">
+          <p className="font-medium text-success">Compliance report published</p>
+          <div className="grid grid-cols-2 gap-1 text-xs text-foreground">
             <span className="text-muted-foreground">Recipients</span>
-            <span className="tabular-nums font-mono">{result.recipientCount}</span>
+            <span className="font-mono tabular-nums">{result.recipientCount}</span>
             <span className="text-muted-foreground">Total allocated (base units)</span>
-            <span className="tabular-nums font-mono break-all">{result.totalAllocated}</span>
+            <span className="break-all font-mono tabular-nums">{result.totalAllocated}</span>
           </div>
           <a href={`${CONFIG.explorer}/tx/${result.txHash}`} target="_blank" rel="noopener noreferrer"
-            className="block font-mono text-blue-600 hover:underline break-all text-xs">
+            className="block break-all font-mono text-xs text-glow hover:underline">
             {result.txHash}
           </a>
         </div>

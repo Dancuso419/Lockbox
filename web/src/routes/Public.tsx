@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { isAddress } from "viem";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import PublicPoolCard from "@/components/PublicPoolCard";
 
 export default function Public() {
@@ -20,23 +19,28 @@ export default function Public() {
   }
 
   return (
-    <div className="container mx-auto max-w-4xl px-4 py-8 space-y-6">
-      <Card className="bg-white shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-medium">Public Pool Lookup</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Input
-            placeholder="0x… pool address"
-            value={inputVal}
-            onChange={(e) => handleChange(e.target.value)}
-            className="font-mono"
-          />
-          {poolAddr.length > 0 && !valid && (
-            <p className="mt-1.5 text-xs text-red-500">Enter a valid Ethereum address</p>
-          )}
-        </CardContent>
-      </Card>
+    <div className="mx-auto max-w-3xl px-6 py-14 space-y-8">
+      <div>
+        <p className="font-mono text-xs uppercase tracking-widest text-glow">Public</p>
+        <h1 className="mt-2 text-3xl font-medium tracking-tight">Explore a pool</h1>
+        <p className="mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground">
+          Anyone can verify the totals and the compliance attestation. Individual allocations stay
+          hidden — that's the whole point.
+        </p>
+      </div>
+
+      <div>
+        <label className="mb-1.5 block text-sm font-medium text-foreground">Pool address</label>
+        <Input
+          placeholder="0x… pool address"
+          value={inputVal}
+          onChange={(e) => handleChange(e.target.value)}
+          className="font-mono"
+        />
+        {poolAddr.length > 0 && !valid && (
+          <p className="mt-1.5 text-xs text-destructive">Enter a valid Ethereum address</p>
+        )}
+      </div>
 
       {valid && <PublicPoolCard address={poolAddr as `0x${string}`} />}
     </div>
