@@ -78,3 +78,46 @@ func TestTotals_SumsAndCounts(t *testing.T) {
 		t.Fatal("unknown pool should return ok=false")
 	}
 }
+
+func TestEntriesReturnsAllRowsAndIsCopySafe(t *testing.T) {
+	s := New()
+	pool := common.HexToAddress("0x1111111111111111111111111111111111111111")
+	r1 := common.HexToAddress("0xaaaa000000000000000000000000000000000001")
+	r2 := common.HexToAddress("0xaaaa000000000000000000000000000000000002")
+	if err := s.Submit(pool, []Input{
+		{Recipient: r1, Amount: big.NewInt(10)},
+		{Recipient: r2, Amount: big.NewInt(20)},
+	}, big.NewInt(100)); err != nil {
+		t.Fatalf("submit: %v", err)
+	}
+
+	rows, ok := s.Entries(pool)
+	if !ok {
+		t.Fatal("expected ok")
+	}
+	if len(rows) != 2 {
+		t.Fatalf("want 2 rows, got %d", len(rows))
+	}
+	byRcpt := map[common.Address]RecipientEntry{}
+	for _, row := range rows {
+		byRcpt[row.Recipient] = row
+	}
+	if byRcpt[r1].Amount.Cmp(big.NewInt(10)) != 0 || byRcpt[r2].Amount.Cmp(big.NewInt(20)) != 0 {
+		t.Fatalf("amounts wrong: %+v", byRcpt)
+	}
+
+	// Mutating a returned Amount must NOT affect the store.
+	rows[0].Amount.SetInt64(999)
+	again, _ := s.Entries(pool)
+	total := new(big.Int)
+	for _, row := range again {
+		total.Add(total, row.Amount)
+	}
+	if total.Cmp(big.NewInt(30)) != 0 {
+		t.Fatalf("store mutated via returned copy: total=%s", total)
+	}
+
+	if _, ok := s.Entries(common.HexToAddress("0x02")); ok {
+		t.Fatal("unknown pool should be ok=false")
+	}
+}

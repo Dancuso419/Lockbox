@@ -75,6 +75,33 @@ func (s *Store) Totals(pool common.Address) (totalAllocated *big.Int, count int,
 	return sum, len(table), true
 }
 
+// RecipientEntry is one row of a pool's table, with the recipient key attached.
+type RecipientEntry struct {
+	Recipient common.Address
+	Amount    *big.Int
+	Nonce     *big.Int
+}
+
+// Entries returns every allocation row for a pool. Amount/Nonce are copies so
+// callers cannot mutate the store. ok=false for an unknown pool.
+func (s *Store) Entries(pool common.Address) ([]RecipientEntry, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	table, exists := s.pools[pool]
+	if !exists {
+		return nil, false
+	}
+	rows := make([]RecipientEntry, 0, len(table))
+	for rcpt, e := range table {
+		rows = append(rows, RecipientEntry{
+			Recipient: rcpt,
+			Amount:    new(big.Int).Set(e.Amount),
+			Nonce:     new(big.Int).Set(e.Nonce),
+		})
+	}
+	return rows, true
+}
+
 func (s *Store) Lookup(pool, recipient common.Address) (Entry, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
