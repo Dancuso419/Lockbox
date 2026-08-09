@@ -14,6 +14,7 @@ const (
 	OPCommandSubmitAllocation = "SUBMIT_ALLOCATION"
 	OPCommandClaimVerify      = "CLAIM_VERIFY"
 	OPCommandComplianceReport = "COMPLIANCE_REPORT"
+	OPCommandUnclaimedReport  = "UNCLAIMED_REPORT"
 
 	TimeoutShutdown = 5 * time.Second
 )

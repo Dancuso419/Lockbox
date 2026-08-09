@@ -23,6 +23,29 @@ type ComplianceReportMessage struct {
 	Pool common.Address
 }
 
+// UnclaimedReportMessage is the ABI payload from sendUnclaimedReport.
+type UnclaimedReportMessage struct {
+	Payload []byte
+	Pool    common.Address
+}
+
+// UnclaimedReportPayload is the parsed UNCLAIMED_REPORT request payload.
+type UnclaimedReportPayload struct {
+	OrganizerPubHex string `json:"organizerPubHex"`
+	ChallengeSig    string `json:"challengeSig"`
+}
+
+// UnclaimedReportResult carries the ECIES-encrypted non-claimant list.
+type UnclaimedReportResult struct {
+	Report string `json:"report"` // 0x-hex ECIES ciphertext of []UnclaimedItem
+}
+
+// UnclaimedItem is one row inside the encrypted report body.
+type UnclaimedItem struct {
+	Recipient string `json:"recipient"`
+	Amount    string `json:"amount"`
+}
+
 type ComplianceReportResult struct {
 	TotalAllocated string `json:"totalAllocated"`
 	RecipientCount int    `json:"recipientCount"`
@@ -59,9 +82,10 @@ type State struct {
 }
 
 var (
-	SubmitAllocationArg  abi.Argument
-	ClaimVerifyArg       abi.Argument
-	ComplianceReportArg  abi.Argument
+	SubmitAllocationArg abi.Argument
+	ClaimVerifyArg      abi.Argument
+	ComplianceReportArg abi.Argument
+	UnclaimedReportArg  abi.Argument
 )
 
 func init() {
@@ -81,6 +105,12 @@ func init() {
 		{Name: "pool", Type: "address"},
 	})
 	ComplianceReportArg = abi.Argument{Type: crTy}
+
+	urTy, _ := abi.NewType("tuple", "", []abi.ArgumentMarshaling{
+		{Name: "payload", Type: "bytes"},
+		{Name: "pool", Type: "address"},
+	})
+	UnclaimedReportArg = abi.Argument{Type: urTy}
 }
 
 // --- DO NOT MODIFY below this line. ---

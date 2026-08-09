@@ -27,6 +27,10 @@ contract PrizePoolInstructionSender {
     // forge-lint: disable-next-line(unsafe-typecast)
     bytes32 public constant OP_COMMAND_COMPLIANCE_REPORT = bytes32("COMPLIANCE_REPORT");
 
+    /// @notice Command for the UNCLAIMED_REPORT action.
+    // forge-lint: disable-next-line(unsafe-typecast)
+    bytes32 public constant OP_COMMAND_UNCLAIMED_REPORT = bytes32("UNCLAIMED_REPORT");
+
     /// @notice Reference to the TEE extension registry contract.
     ITeeExtensionRegistry public immutable TEE_EXTENSION_REGISTRY;
     /// @notice Reference to the TEE machine registry contract.
@@ -41,6 +45,7 @@ contract PrizePoolInstructionSender {
     struct SubmitAllocationMessage { bytes ciphertext; address pool; }
     struct ClaimVerifyMessage { bytes payload; address pool; }
     struct ComplianceReportMessage { address pool; }
+    struct UnclaimedReportMessage { bytes payload; address pool; }
 
     /// @notice Initializes the contract with registry addresses.
     /// @param _teeExtensionRegistry Address of the TEE extension registry.
@@ -110,6 +115,22 @@ contract PrizePoolInstructionSender {
             opType: OP_TYPE_PRIZEPOOL,
             opCommand: OP_COMMAND_COMPLIANCE_REPORT,
             message: abi.encode(ComplianceReportMessage({pool: pool})),
+            cosigners: cosigners,
+            cosignersThreshold: 0,
+            claimBackAddress: msg.sender
+        });
+        TEE_EXTENSION_REGISTRY.sendInstructions{value: msg.value}(teeIds, params);
+    }
+
+    /// @notice Ask the TEE for the encrypted non-claimant list for `pool`.
+    /// `payload` carries the organizer enc pubkey + challenge sig.
+    function sendUnclaimedReport(bytes calldata payload, address pool) external payable {
+        address[] memory teeIds = TEE_MACHINE_REGISTRY.getRandomTeeIds(_getExtensionId(), 1);
+        address[] memory cosigners = new address[](0);
+        ITeeExtensionRegistry.TeeInstructionParams memory params = ITeeExtensionRegistry.TeeInstructionParams({
+            opType: OP_TYPE_PRIZEPOOL,
+            opCommand: OP_COMMAND_UNCLAIMED_REPORT,
+            message: abi.encode(UnclaimedReportMessage({payload: payload, pool: pool})),
             cosigners: cosigners,
             cosignersThreshold: 0,
             claimBackAddress: msg.sender
