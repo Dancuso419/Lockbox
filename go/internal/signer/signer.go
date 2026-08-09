@@ -142,9 +142,9 @@ func (s *Signer) ComplianceDigestForTest(pool common.Address, totalDeposited, to
 	return s.complianceDigest(pool, totalDeposited, totalAllocated, recipientCount)
 }
 
-// DecryptWith decrypts ECIES ciphertext with an arbitrary private key (hex).
-// Helper for tests; production decrypt uses the signer's own key via Decrypt.
-func DecryptWith(privHex string, ct []byte) ([]byte, error) {
+// DecryptWithForTest decrypts ECIES ciphertext with an arbitrary private key (hex).
+// Helper for tests only; production decrypt uses the signer's own key via Decrypt.
+func DecryptWithForTest(privHex string, ct []byte) ([]byte, error) {
 	priv, err := crypto.HexToECDSA(strings.TrimPrefix(privHex, "0x"))
 	if err != nil {
 		return nil, err

@@ -85,7 +85,7 @@ func TestUnclaimedReportHappyPath(t *testing.T) {
 		t.Fatalf("unmarshal result: %v", err)
 	}
 	ct := common.FromHex(res.Report)
-	plain, err := signer.DecryptWith(orgPkHex, ct)
+	plain, err := signer.DecryptWithForTest(orgPkHex, ct)
 	if err != nil {
 		t.Fatalf("decrypt: %v", err)
 	}
