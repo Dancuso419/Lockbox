@@ -39,7 +39,7 @@ contract PoolFactoryTest is Test {
     }
 
     function test_createPool_erc20_pullsFunds() public {
-        MockERC20 token = new MockERC20();
+        MockERC20 token = new MockERC20(18);
         token.mint(organizer, 100 ether);
         vm.startPrank(organizer);
         token.approve(address(factory), 100 ether);
@@ -52,7 +52,7 @@ contract PoolFactoryTest is Test {
     }
 
     function test_createPool_erc20_withValueReverts() public {
-        MockERC20 token = new MockERC20();
+        MockERC20 token = new MockERC20(18);
         token.mint(organizer, 100 ether);
         vm.deal(organizer, 1 ether);
         vm.startPrank(organizer);
@@ -87,7 +87,7 @@ contract PoolFactoryTest is Test {
     }
 
     function test_erc20_claimThenSweep() public {
-        MockERC20 token = new MockERC20();
+        MockERC20 token = new MockERC20(18);
         token.mint(organizer, 100 ether);
         vm.startPrank(organizer);
         token.approve(address(factory), 100 ether);
@@ -105,5 +105,32 @@ contract PoolFactoryTest is Test {
         pool.sweep();
         assertEq(token.balanceOf(organizer), 60 ether); // remainder back
         assertEq(token.balanceOf(address(pool)), 0);
+    }
+
+    function test_fxrp_sixDecimals_claimThenSweep() public {
+        MockERC20 fxrp = new MockERC20(6);            // FXRP: 6 decimals
+        assertEq(fxrp.decimals(), 6);
+        uint256 total = 1000e6;                         // 1000 FXRP
+        fxrp.mint(organizer, total);
+        vm.startPrank(organizer);
+        fxrp.approve(address(factory), total);
+        Pool pool = factory.createPool(address(fxrp), total, deadline, signer);
+        vm.stopPrank();
+        assertEq(fxrp.balanceOf(address(pool)), total);
+        assertEq(pool.totalDeposited(), total);
+
+        address recipient = address(0xBEEF);
+        uint256 amount = 250e6;                         // 250 FXRP
+        bytes memory sig = _sign(pool, recipient, amount, 1); // sign BEFORE prank
+        vm.prank(recipient);
+        pool.claim(amount, 1, sig);
+        assertEq(fxrp.balanceOf(recipient), amount);
+        assertEq(pool.totalClaimed(), amount);
+
+        vm.warp(deadline + 1);
+        vm.prank(organizer);
+        pool.sweep();
+        assertEq(fxrp.balanceOf(organizer), total - amount); // 750 FXRP remainder
+        assertEq(fxrp.balanceOf(address(pool)), 0);
     }
 }
