@@ -3,6 +3,7 @@ import { useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { CONFIG } from "./config";
 import ThemeToggle from "./components/ThemeToggle";
+import ErrorBoundary from "./components/ErrorBoundary";
 import Landing from "./routes/Landing";
 import Public from "./routes/Public";
 import Organizer from "./routes/Organizer";
@@ -132,12 +133,14 @@ export default function App() {
     <div className="flex min-h-screen flex-col">
       <TopBar />
       <main className="flex-1">
-        <Routes>
-          <Route path="/" element={<Landing />} />
-          <Route path="/pool" element={<Public />} />
-          <Route path="/organizer" element={<Organizer />} />
-          <Route path="/claim" element={<Recipient />} />
-        </Routes>
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/" element={<Landing />} />
+            <Route path="/pool" element={<Public />} />
+            <Route path="/organizer" element={<Organizer />} />
+            <Route path="/claim" element={<Recipient />} />
+          </Routes>
+        </ErrorBoundary>
       </main>
       <Footer />
     </div>

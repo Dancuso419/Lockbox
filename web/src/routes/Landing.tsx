@@ -1,9 +1,42 @@
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { motion, useScroll, useTransform, useReducedMotion, type MotionValue } from "motion/react";
 import { ArrowRight, Lock, Eye, ShieldCheck } from "lucide-react";
 import Keyhole from "@/components/Keyhole";
 import Reveal from "@/components/Reveal";
+
+// Scroll progress (0..1) of an element travelling through the viewport.
+// Plain rAF-throttled scroll math — no animation library, no WAAPI.
+function useScrollProgress(ref: React.RefObject<HTMLElement | null>) {
+  const [p, setP] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let raf = 0;
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      const total = rect.height - window.innerHeight;
+      setP(total > 0 ? Math.min(1, Math.max(0, -rect.top / total)) : 0);
+    };
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(update);
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll);
+    update();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      cancelAnimationFrame(raf);
+    };
+  }, [ref]);
+  return p;
+}
+
+function stepOpacity(p: number, index: number, total: number) {
+  const center = (index + 0.5) / total;
+  return Math.max(0.18, 1 - Math.abs(p - center) * total * 1.05);
+}
 
 const STEPS = [
   {
@@ -87,63 +120,60 @@ function Hero() {
   );
 }
 
-function Step({ step, progress, index, total }: { step: (typeof STEPS)[number]; progress: MotionValue<number>; index: number; total: number }) {
-  const seg = 1 / total;
-  const start = index * seg;
-  const opacity = useTransform(progress, [start - seg * 0.5, start, start + seg * 0.5, start + seg], [0.15, 1, 1, 0.15]);
-  const x = useTransform(progress, [start - seg * 0.5, start], [30, 0]);
-  return (
-    <motion.div style={{ opacity, x }} className="border-l border-border-strong py-8 pl-6">
-      <div className="font-mono text-xs text-glow">{step.n}</div>
-      <h3 className="mt-2 text-2xl font-medium tracking-tight">{step.title}</h3>
-      <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">{step.body}</p>
-    </motion.div>
-  );
-}
-
 function Scrolly() {
   const ref = useRef<HTMLDivElement>(null);
-  const reduce = useReducedMotion();
-  const { scrollYProgress } = useScroll({ target: ref, offset: ["start start", "end end"] });
-  const scale = useTransform(scrollYProgress, [0, 1], [0.8, 1.35]);
-  const glow = useTransform(scrollYProgress, [0, 1], [0.4, 1]);
+  const p = useScrollProgress(ref);
+  const scale = 0.82 + p * 0.5;
 
-  if (reduce) {
-    // Static, fully-legible fallback — no pinning, no scroll coupling.
-    return (
-      <section className="mx-auto max-w-6xl px-6 py-24">
-        <h2 className="mb-12 text-3xl font-medium tracking-tight">How the secret stays a secret</h2>
-        <div className="grid gap-6 sm:grid-cols-2">
+  return (
+    <section ref={ref} className="relative md:h-[380vh]">
+      {/* Static stacked fallback on small screens + reduced-motion (no pinning) */}
+      <div className="mx-auto max-w-6xl px-6 py-20 md:hidden">
+        <h2 className="mb-10 font-mono text-xs uppercase tracking-widest text-muted-foreground">
+          How the secret stays a secret
+        </h2>
+        <div className="space-y-8">
           {STEPS.map((s) => (
-            <div key={s.n} className="border-l border-border-strong py-6 pl-6">
+            <div key={s.n} className="border-l border-border-strong py-2 pl-6">
               <div className="font-mono text-xs text-glow">{s.n}</div>
               <h3 className="mt-2 text-2xl font-medium tracking-tight">{s.title}</h3>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
             </div>
           ))}
         </div>
-      </section>
-    );
-  }
+      </div>
 
-  return (
-    <section ref={ref} className="relative h-[400vh]">
-      <div className="sticky top-0 flex h-screen items-center overflow-hidden">
+      {/* Pinned scrollytelling on md+ */}
+      <div className="sticky top-0 hidden h-screen items-center overflow-hidden md:flex motion-reduce:static motion-reduce:h-auto motion-reduce:py-24">
         <div className="glow-radial pointer-events-none absolute inset-0" />
         <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-8 px-6 lg:grid-cols-2">
           <div className="relative hidden aspect-square items-center justify-center lg:flex">
-            <motion.div style={{ scale, opacity: glow }} className="glow-radial absolute inset-0" />
-            <motion.div style={{ scale }} className="relative h-[80%] w-[80%]">
+            <div
+              className="glow-radial absolute inset-0 motion-reduce:!opacity-70"
+              style={{ transform: `scale(${scale})`, opacity: 0.4 + p * 0.6 }}
+            />
+            <div
+              className="relative h-[80%] w-[80%] motion-reduce:!scale-100"
+              style={{ transform: `scale(${scale})` }}
+            >
               <Keyhole className="h-full w-full" />
-            </motion.div>
+            </div>
           </div>
           <div>
-            <h2 className="mb-4 text-sm font-mono uppercase tracking-widest text-muted-foreground">
+            <h2 className="mb-4 font-mono text-sm uppercase tracking-widest text-muted-foreground">
               How the secret stays a secret
             </h2>
             <div className="relative">
               {STEPS.map((s, i) => (
-                <Step key={s.n} step={s} progress={scrollYProgress} index={i} total={STEPS.length} />
+                <div
+                  key={s.n}
+                  className="border-l border-border-strong py-8 pl-6 transition-opacity duration-200 motion-reduce:!opacity-100"
+                  style={{ opacity: stepOpacity(p, i, STEPS.length) }}
+                >
+                  <div className="font-mono text-xs text-glow">{s.n}</div>
+                  <h3 className="mt-2 text-2xl font-medium tracking-tight">{s.title}</h3>
+                  <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">{s.body}</p>
+                </div>
               ))}
             </div>
           </div>
