@@ -89,8 +89,8 @@ Route `OPCommandUnclaimedReport` → `processUnclaimedReport` → `handleUnclaim
 
 ### go/internal/config/config.go, contracts/InstructionSender.sol, go/pkg/types/types.go
 - `OPCommandUnclaimedReport = "UNCLAIMED_REPORT"` (byte-identical in `config.go` and `InstructionSender.sol` `bytes32("UNCLAIMED_REPORT")`; ≤32 bytes — it's 16).
-- `InstructionSender`: `struct UnclaimedReportMessage { address pool; bytes payload; }`, `sendUnclaimedReport(address pool, bytes calldata payload)` → `abi.encode(UnclaimedReportMessage({pool, payload}))` (single-tuple, matching the Go decoder — same shape as `ClaimVerifyMessage`).
-- `types.go`: `UnclaimedReportMessage{Pool common.Address; Payload []byte}`, `UnclaimedReportArg` (tuple(address pool, bytes payload)), `UnclaimedReportPayload{OrganizerPubHex, ChallengeSig string}`, `UnclaimedReportResult{Report string}`, and an unexported `unclaimedItem{Recipient, Amount string}` for the encrypted body.
+- `InstructionSender`: `struct UnclaimedReportMessage { bytes payload; address pool; }`, `sendUnclaimedReport(bytes calldata payload, address pool)` → `abi.encode(UnclaimedReportMessage({payload, pool}))` (single-tuple, matching the Go decoder — same `(payload, pool)` order as the proven `ClaimVerifyMessage`).
+- `types.go`: `UnclaimedReportMessage{Payload []byte; Pool common.Address}`, `UnclaimedReportArg` (tuple(bytes payload, address pool)), `UnclaimedReportPayload{OrganizerPubHex, ChallengeSig string}`, `UnclaimedReportResult{Report string}`, and an exported `UnclaimedItem{Recipient, Amount string}` (shared types package) for the encrypted body.
 
 ## 5. Security & privacy
 
