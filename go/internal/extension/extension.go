@@ -24,8 +24,10 @@ import (
 	"github.com/flare-foundation/tee-node/pkg/processorutils"
 )
 
-type depositReader interface {
+type poolReader interface {
 	TotalDeposited(ctx context.Context, pool common.Address) (*big.Int, error)
+	Organizer(ctx context.Context, pool common.Address) (common.Address, error)
+	UsedNonce(ctx context.Context, pool common.Address, nonce *big.Int) (bool, error)
 }
 
 type Extension struct {
@@ -34,10 +36,10 @@ type Extension struct {
 
 	signer *signer.Signer
 	store  *allocations.Store
-	reader depositReader
+	reader poolReader
 }
 
-func New(extensionPort, signPort int, s *signer.Signer, store *allocations.Store, reader depositReader) *Extension {
+func New(extensionPort, signPort int, s *signer.Signer, store *allocations.Store, reader poolReader) *Extension {
 	e := &Extension{signer: s, store: store, reader: reader}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /state", e.stateHandler)
@@ -93,6 +95,9 @@ func (e *Extension) processPrizePool(action teetypes.Action, df *instruction.Dat
 		return http.StatusOK, b
 	case df.OPCommand == teeutils.ToHash(config.OPCommandComplianceReport):
 		b, _ := json.Marshal(e.processComplianceReport(action, df))
+		return http.StatusOK, b
+	case df.OPCommand == teeutils.ToHash(config.OPCommandUnclaimedReport):
+		b, _ := json.Marshal(e.processUnclaimedReport(action, df))
 		return http.StatusOK, b
 	default:
 		return http.StatusNotImplemented, []byte(fmt.Sprintf("unsupported op command: %s", df.OPCommand.Hex()))
@@ -191,27 +196,33 @@ func (e *Extension) handleComplianceReport(ctx context.Context, pool common.Addr
 	return 1, out
 }
 
-func (e *Extension) handleClaimVerify(ctx context.Context, pool common.Address, payload []byte) (uint8, []byte) {
-	var req types.ClaimVerifyPayload
-	if err := json.Unmarshal(payload, &req); err != nil {
-		return 0, []byte("bad payload")
-	}
-	challenge := "ConfidentialPrizePool claim\npool:" + pool.Hex() + "\nkey:" + req.RecipientPubHex
-	sig := common.FromHex(req.ChallengeSig)
-	if len(sig) != 65 {
-		return 0, []byte("bad challenge sig")
-	}
-	if sig[64] < 27 {
-		return 0, []byte("bad challenge sig")
+// recoverChallenge recovers the signer address of a personal_sign challenge.
+// sigHex is a 65-byte hex signature with V in {27,28}.
+func recoverChallenge(challenge, sigHex string) (common.Address, error) {
+	sig := common.FromHex(sigHex)
+	if len(sig) != 65 || sig[64] < 27 {
+		return common.Address{}, fmt.Errorf("bad challenge sig")
 	}
 	rec := make([]byte, 65)
 	copy(rec, sig)
 	rec[64] -= 27
 	pub, err := crypto.SigToPub(accounts.TextHash([]byte(challenge)), rec)
 	if err != nil {
-		return 0, []byte("challenge recover failed")
+		return common.Address{}, err
 	}
-	recipient := crypto.PubkeyToAddress(*pub)
+	return crypto.PubkeyToAddress(*pub), nil
+}
+
+func (e *Extension) handleClaimVerify(ctx context.Context, pool common.Address, payload []byte) (uint8, []byte) {
+	var req types.ClaimVerifyPayload
+	if err := json.Unmarshal(payload, &req); err != nil {
+		return 0, []byte("bad payload")
+	}
+	challenge := "ConfidentialPrizePool claim\npool:" + pool.Hex() + "\nkey:" + req.RecipientPubHex
+	recipient, err := recoverChallenge(challenge, req.ChallengeSig)
+	if err != nil {
+		return 0, []byte("bad challenge sig")
+	}
 
 	entry, ok := e.store.Lookup(pool, recipient)
 	if !ok {
@@ -232,5 +243,63 @@ func (e *Extension) handleClaimVerify(ctx context.Context, pool common.Address, 
 		return 0, []byte("encrypt failed")
 	}
 	out, _ := json.Marshal(types.ClaimVerifyResult{Voucher: "0x" + common.Bytes2Hex(ct)})
+	return 1, out
+}
+
+func (e *Extension) processUnclaimedReport(action teetypes.Action, df *instruction.DataFixed) teetypes.ActionResult {
+	var msg types.UnclaimedReportMessage
+	if err := structs.DecodeTo(types.UnclaimedReportArg, df.OriginalMessage, &msg); err != nil {
+		return buildResult(action, df, nil, 0, fmt.Errorf("decoding message: %w", err))
+	}
+	status, data := e.handleUnclaimedReport(context.Background(), msg.Pool, msg.Payload)
+	return buildResult(action, df, data, status, resultErr(status, data))
+}
+
+// handleUnclaimedReport verifies the caller is the pool organizer, joins the
+// private allocation table against on-chain usedNonce, and returns the
+// non-claimant list ECIES-encrypted to the organizer. Nothing is logged in
+// cleartext or published on-chain.
+func (e *Extension) handleUnclaimedReport(ctx context.Context, pool common.Address, payload []byte) (uint8, []byte) {
+	var req types.UnclaimedReportPayload
+	if err := json.Unmarshal(payload, &req); err != nil {
+		return 0, []byte("bad payload")
+	}
+	challenge := "ConfidentialPrizePool unclaimed\npool:" + pool.Hex() + "\nkey:" + req.OrganizerPubHex
+	caller, err := recoverChallenge(challenge, req.ChallengeSig)
+	if err != nil {
+		return 0, []byte("bad challenge sig")
+	}
+	organizer, err := e.reader.Organizer(ctx, pool)
+	if err != nil {
+		return 0, []byte("organizer read failed")
+	}
+	if caller != organizer {
+		return 0, []byte("not organizer")
+	}
+
+	rows, ok := e.store.Entries(pool)
+	if !ok {
+		return 0, []byte("no allocations for pool")
+	}
+	unclaimed := make([]types.UnclaimedItem, 0, len(rows))
+	for _, row := range rows {
+		used, err := e.reader.UsedNonce(ctx, pool, row.Nonce)
+		if err != nil {
+			return 0, []byte("nonce read failed")
+		}
+		if !used {
+			unclaimed = append(unclaimed, types.UnclaimedItem{
+				Recipient: row.Recipient.Hex(),
+				Amount:    row.Amount.String(),
+			})
+		}
+	}
+
+	body, _ := json.Marshal(unclaimed)
+	ct, err := signer.EncryptTo(req.OrganizerPubHex, body)
+	if err != nil {
+		return 0, []byte("encrypt failed")
+	}
+	out, _ := json.Marshal(types.UnclaimedReportResult{Report: "0x" + common.Bytes2Hex(ct)})
 	return 1, out
 }

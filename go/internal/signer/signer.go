@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rand"
 	"math/big"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -15,9 +16,9 @@ import (
 // Must byte-match Pool.sol: EIP712("ConfidentialPrizePool","1") and
 // Voucher(address recipient,uint256 amount,uint256 nonce).
 var (
-	domainTypehash  = crypto.Keccak256([]byte("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"))
-	nameHash        = crypto.Keccak256([]byte("ConfidentialPrizePool"))
-	versionHash     = crypto.Keccak256([]byte("1"))
+	domainTypehash     = crypto.Keccak256([]byte("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"))
+	nameHash           = crypto.Keccak256([]byte("ConfidentialPrizePool"))
+	versionHash        = crypto.Keccak256([]byte("1"))
 	voucherTypehash    = crypto.Keccak256([]byte("Voucher(address recipient,uint256 amount,uint256 nonce)"))
 	complianceTypehash = crypto.Keccak256([]byte("ComplianceReport(address pool,uint256 totalDeposited,uint256 totalAllocated,uint256 recipientCount)"))
 )
@@ -139,4 +140,14 @@ func (s *Signer) SignComplianceReport(pool common.Address, totalDeposited, total
 // ComplianceDigestForTest exposes the digest for tests/tools only.
 func (s *Signer) ComplianceDigestForTest(pool common.Address, totalDeposited, totalAllocated, recipientCount *big.Int) []byte {
 	return s.complianceDigest(pool, totalDeposited, totalAllocated, recipientCount)
+}
+
+// DecryptWith decrypts ECIES ciphertext with an arbitrary private key (hex).
+// Helper for tests; production decrypt uses the signer's own key via Decrypt.
+func DecryptWith(privHex string, ct []byte) ([]byte, error) {
+	priv, err := crypto.HexToECDSA(strings.TrimPrefix(privHex, "0x"))
+	if err != nil {
+		return nil, err
+	}
+	return ecies.ImportECDSA(priv).Decrypt(ct, nil, nil)
 }

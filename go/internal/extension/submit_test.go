@@ -19,6 +19,12 @@ type fakeReader struct{ total *big.Int }
 func (f fakeReader) TotalDeposited(ctx context.Context, pool common.Address) (*big.Int, error) {
 	return f.total, nil
 }
+func (f fakeReader) Organizer(ctx context.Context, pool common.Address) (common.Address, error) {
+	return common.Address{}, nil
+}
+func (f fakeReader) UsedNonce(ctx context.Context, pool common.Address, nonce *big.Int) (bool, error) {
+	return false, nil
+}
 
 func TestSubmitAllocation_StoresAndHidesAmounts(t *testing.T) {
 	sgn, _ := signer.NewFromHex("353c43dada1ebc390f9594ed91753446e19389ae545fc7fada020816346efb73", big.NewInt(114))
