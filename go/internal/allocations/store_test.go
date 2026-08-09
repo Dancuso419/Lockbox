@@ -54,6 +54,35 @@ func TestSubmit_SecondSubmitRejected(t *testing.T) {
 	}
 }
 
+func TestSubmit_NoncesAreRandomNotSequential(t *testing.T) {
+	s := New()
+	pool := addr(1)
+	entries := []Input{
+		{Recipient: addr(0xA), Amount: big.NewInt(1)},
+		{Recipient: addr(0xB), Amount: big.NewInt(1)},
+		{Recipient: addr(0xC), Amount: big.NewInt(1)},
+	}
+	if err := s.Submit(pool, entries, big.NewInt(10)); err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+	rows, _ := s.Entries(pool)
+	seq := big.NewInt(2)
+	small := 0
+	seen := map[string]bool{}
+	for _, r := range rows {
+		if r.Nonce.Cmp(seq) < 0 {
+			small++
+		}
+		if seen[r.Nonce.String()] {
+			t.Fatalf("duplicate nonce %s", r.Nonce)
+		}
+		seen[r.Nonce.String()] = true
+	}
+	if small > 0 {
+		t.Fatalf("found %d small/sequential-looking nonces; expected random", small)
+	}
+}
+
 func TestLookup_IsolatesPools(t *testing.T) {
 	s := New()
 	_ = s.Submit(addr(1), []Input{{Recipient: addr(0xA), Amount: big.NewInt(1)}}, big.NewInt(10))

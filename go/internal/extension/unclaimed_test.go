@@ -63,10 +63,19 @@ func TestUnclaimedReportHappyPath(t *testing.T) {
 		t.Fatalf("submit: %v", err)
 	}
 
+	// Nonces are random; mark r2 and r3 claimed by their actual nonces so only r1 remains.
+	usedNonces := map[string]bool{}
+	storeRows, _ := store.Entries(pool)
+	for _, row := range storeRows {
+		if row.Recipient == r2 || row.Recipient == r3 {
+			usedNonces[row.Nonce.String()] = true
+		}
+	}
+
 	reader := &fakePoolReader{
 		deposit:   big.NewInt(100),
 		organizer: organizer,
-		used:      map[string]bool{"1": true, "2": true},
+		used:      usedNonces,
 	}
 	e := New(0, 0, sgn, store, reader)
 

@@ -68,7 +68,11 @@ func TestClaimVerify_ReturnsEncryptedVoucher(t *testing.T) {
 	}
 	vsig := common.FromHex(v.Signature)
 	vsig[64] -= 27
-	digest := sgn.VoucherDigestForTest(pool, recipient, big.NewInt(3), big.NewInt(0))
+	nonce, nok := new(big.Int).SetString(v.Nonce, 10)
+	if !nok {
+		t.Fatalf("bad nonce in voucher: %q", v.Nonce)
+	}
+	digest := sgn.VoucherDigestForTest(pool, recipient, big.NewInt(3), nonce)
 	pub, _ := crypto.SigToPub(digest, vsig)
 	if crypto.PubkeyToAddress(*pub) != sgn.Address() {
 		t.Fatal("voucher sig does not recover to TEE signer")

@@ -3,6 +3,7 @@
 package allocations
 
 import (
+	"crypto/rand"
 	"fmt"
 	"math/big"
 	"sync"
@@ -30,6 +31,16 @@ func New() *Store {
 	return &Store{pools: make(map[common.Address]map[common.Address]*Entry)}
 }
 
+// randomNonce returns a random 256-bit nonce. Random (not sequential) so the
+// on-chain nonce reveals nothing about a recipient's position in the table.
+func randomNonce() (*big.Int, error) {
+	var b [32]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return nil, err
+	}
+	return new(big.Int).SetBytes(b[:]), nil
+}
+
 // Submit validates and stores a pool's allocations. Allocations are immutable:
 // a pool that already has a table is rejected. sum(amounts) must be <= total.
 func (s *Store) Submit(pool common.Address, entries []Input, total *big.Int) error {
@@ -41,15 +52,26 @@ func (s *Store) Submit(pool common.Address, entries []Input, total *big.Int) err
 	}
 
 	table := make(map[common.Address]*Entry, len(entries))
+	seenNonce := make(map[string]bool, len(entries))
 	sum := new(big.Int)
-	for i, in := range entries {
+	for _, in := range entries {
 		if in.Amount == nil || in.Amount.Sign() <= 0 {
 			return fmt.Errorf("amount must be positive")
 		}
 		if _, dup := table[in.Recipient]; dup {
 			return fmt.Errorf("duplicate recipient")
 		}
-		table[in.Recipient] = &Entry{Amount: new(big.Int).Set(in.Amount), Nonce: big.NewInt(int64(i))}
+		nonce, err := randomNonce()
+		if err != nil {
+			return fmt.Errorf("nonce gen: %w", err)
+		}
+		for seenNonce[nonce.String()] {
+			if nonce, err = randomNonce(); err != nil {
+				return fmt.Errorf("nonce gen: %w", err)
+			}
+		}
+		seenNonce[nonce.String()] = true
+		table[in.Recipient] = &Entry{Amount: new(big.Int).Set(in.Amount), Nonce: nonce}
 		sum.Add(sum, in.Amount)
 	}
 	if sum.Cmp(total) > 0 {
