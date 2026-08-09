@@ -16,8 +16,9 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
-func challengeMessage(pool common.Address, recipientPubHex string) string {
-	return "ConfidentialPrizePool claim\npool:" + pool.Hex() + "\nkey:" + recipientPubHex
+func challengeMessage(pool common.Address, recipientPubHex, claimAddr string) string {
+	return "ConfidentialPrizePool claim\npool:" + pool.Hex() +
+		"\nkey:" + recipientPubHex + "\nclaim:" + claimAddr
 }
 
 func TestClaimVerify_ReturnsEncryptedVoucher(t *testing.T) {
@@ -35,7 +36,7 @@ func TestClaimVerify_ReturnsEncryptedVoucher(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	msg := challengeMessage(pool, recipientPub)
+	msg := challengeMessage(pool, recipientPub, "")
 	sig, _ := crypto.Sign(accounts.TextHash([]byte(msg)), rk)
 	sig[64] += 27
 	payload := types.ClaimVerifyPayload{RecipientPubHex: recipientPub, ChallengeSig: "0x" + common.Bytes2Hex(sig)}
@@ -85,7 +86,7 @@ func TestClaimVerify_UnknownRecipientRejected(t *testing.T) {
 	rk, _ := crypto.HexToECDSA("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
 	recipientPub := "0x" + common.Bytes2Hex(crypto.FromECDSAPub(&rk.PublicKey))
 	pool := common.Address{19: 9}
-	msg := challengeMessage(pool, recipientPub)
+	msg := challengeMessage(pool, recipientPub, "")
 	sig, _ := crypto.Sign(accounts.TextHash([]byte(msg)), rk)
 	sig[64] += 27
 	pb, _ := json.Marshal(types.ClaimVerifyPayload{RecipientPubHex: recipientPub, ChallengeSig: "0x" + common.Bytes2Hex(sig)})
@@ -110,7 +111,7 @@ func TestClaimVerify_WrongPoolChallengeRejected(t *testing.T) {
 	_ = st.Submit(poolA, []allocations.Input{{Recipient: recipient, Amount: big.NewInt(3)}}, big.NewInt(10))
 
 	// recipient signs a challenge for poolA, but the request is submitted for poolB.
-	msg := challengeMessage(poolA, recipientPub)
+	msg := challengeMessage(poolA, recipientPub, "")
 	sig, _ := crypto.Sign(accounts.TextHash([]byte(msg)), rk)
 	sig[64] += 27
 	pb, _ := json.Marshal(types.ClaimVerifyPayload{RecipientPubHex: recipientPub, ChallengeSig: "0x" + common.Bytes2Hex(sig)})
@@ -120,6 +121,86 @@ func TestClaimVerify_WrongPoolChallengeRejected(t *testing.T) {
 	status, _ := e.handleClaimVerify(context.Background(), poolB, pb)
 	if status != 0 {
 		t.Fatal("expected wrong-pool challenge to be rejected")
+	}
+}
+
+func TestClaimVerify_FreshClaimAddress(t *testing.T) {
+	teeKey := "353c43dada1ebc390f9594ed91753446e19389ae545fc7fada020816346efb73"
+	sgn, _ := signer.NewFromHex(teeKey, big.NewInt(114))
+	st := allocations.New()
+	e := &Extension{signer: sgn, store: st, reader: fakeReader{total: big.NewInt(10)}}
+
+	rk, _ := crypto.HexToECDSA("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+	identity := crypto.PubkeyToAddress(rk.PublicKey)
+	recipientPub := "0x" + common.Bytes2Hex(crypto.FromECDSAPub(&rk.PublicKey))
+
+	pool := common.Address{19: 1}
+	if err := st.Submit(pool, []allocations.Input{{Recipient: identity, Amount: big.NewInt(3)}}, big.NewInt(10)); err != nil {
+		t.Fatal(err)
+	}
+
+	claim := common.HexToAddress("0x00000000000000000000000000000000cafe0001")
+	msg := challengeMessage(pool, recipientPub, claim.Hex())
+	sig, _ := crypto.Sign(accounts.TextHash([]byte(msg)), rk)
+	sig[64] += 27
+	pb, _ := json.Marshal(types.ClaimVerifyPayload{
+		RecipientPubHex: recipientPub,
+		ChallengeSig:    "0x" + common.Bytes2Hex(sig),
+		ClaimAddress:    claim.Hex(),
+	})
+
+	status, body := e.handleClaimVerify(context.Background(), pool, pb)
+	if status != 1 {
+		t.Fatalf("status=%d body=%s", status, body)
+	}
+	var res types.ClaimVerifyResult
+	_ = json.Unmarshal(body, &res)
+	rEcies, _ := signer.NewFromHex("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", big.NewInt(114))
+	voucherJSON, err := rEcies.Decrypt(common.FromHex(res.Voucher))
+	if err != nil {
+		t.Fatalf("decrypt: %v", err)
+	}
+	var v struct {
+		Amount    string `json:"amount"`
+		Nonce     string `json:"nonce"`
+		Signature string `json:"signature"`
+	}
+	_ = json.Unmarshal(voucherJSON, &v)
+
+	nonce, _ := new(big.Int).SetString(v.Nonce, 10)
+	vsig := common.FromHex(v.Signature)
+	vsig[64] -= 27
+	digestClaim := sgn.VoucherDigestForTest(pool, claim, big.NewInt(3), nonce)
+	pub, _ := crypto.SigToPub(digestClaim, vsig)
+	if crypto.PubkeyToAddress(*pub) != sgn.Address() {
+		t.Fatal("voucher does not verify for the fresh claim address")
+	}
+	digestIdentity := sgn.VoucherDigestForTest(pool, identity, big.NewInt(3), nonce)
+	pubI, _ := crypto.SigToPub(digestIdentity, vsig)
+	if crypto.PubkeyToAddress(*pubI) == sgn.Address() {
+		t.Fatal("voucher should not verify for the identity address when a claim address is set")
+	}
+}
+
+func TestClaimVerify_BadClaimAddressRejected(t *testing.T) {
+	sgn, _ := signer.NewFromHex("353c43dada1ebc390f9594ed91753446e19389ae545fc7fada020816346efb73", big.NewInt(114))
+	st := allocations.New()
+	e := &Extension{signer: sgn, store: st, reader: fakeReader{total: big.NewInt(10)}}
+	rk, _ := crypto.HexToECDSA("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
+	identity := crypto.PubkeyToAddress(rk.PublicKey)
+	recipientPub := "0x" + common.Bytes2Hex(crypto.FromECDSAPub(&rk.PublicKey))
+	pool := common.Address{19: 1}
+	_ = st.Submit(pool, []allocations.Input{{Recipient: identity, Amount: big.NewInt(3)}}, big.NewInt(10))
+
+	bad := "not-an-address"
+	msg := challengeMessage(pool, recipientPub, bad)
+	sig, _ := crypto.Sign(accounts.TextHash([]byte(msg)), rk)
+	sig[64] += 27
+	pb, _ := json.Marshal(types.ClaimVerifyPayload{
+		RecipientPubHex: recipientPub, ChallengeSig: "0x" + common.Bytes2Hex(sig), ClaimAddress: bad,
+	})
+	if status, _ := e.handleClaimVerify(context.Background(), pool, pb); status != 0 {
+		t.Fatal("expected bad claim address to be rejected")
 	}
 }
 

@@ -65,6 +65,7 @@ type AllocationItem struct {
 type ClaimVerifyPayload struct {
 	RecipientPubHex string `json:"recipientPubHex"`
 	ChallengeSig    string `json:"challengeSig"`
+	ClaimAddress    string `json:"claimAddress"` // optional 0x addr; empty => pay identity address
 }
 
 type SubmitAllocationResult struct {

@@ -218,17 +218,28 @@ func (e *Extension) handleClaimVerify(ctx context.Context, pool common.Address, 
 	if err := json.Unmarshal(payload, &req); err != nil {
 		return 0, []byte("bad payload")
 	}
-	challenge := "ConfidentialPrizePool claim\npool:" + pool.Hex() + "\nkey:" + req.RecipientPubHex
-	recipient, err := recoverChallenge(challenge, req.ChallengeSig)
+	challenge := "ConfidentialPrizePool claim\npool:" + pool.Hex() +
+		"\nkey:" + req.RecipientPubHex + "\nclaim:" + req.ClaimAddress
+	identityAddr, err := recoverChallenge(challenge, req.ChallengeSig)
 	if err != nil {
 		return 0, []byte("bad challenge sig")
 	}
 
-	entry, ok := e.store.Lookup(pool, recipient)
+	entry, ok := e.store.Lookup(pool, identityAddr)
 	if !ok {
 		return 0, []byte("not eligible")
 	}
-	vsig, err := e.signer.SignVoucher(pool, recipient, entry.Amount, entry.Nonce)
+
+	// Redirect payout to a fresh, identity-unlinkable claim address when supplied.
+	payTo := identityAddr
+	if req.ClaimAddress != "" {
+		if !common.IsHexAddress(req.ClaimAddress) {
+			return 0, []byte("bad claim address")
+		}
+		payTo = common.HexToAddress(req.ClaimAddress)
+	}
+
+	vsig, err := e.signer.SignVoucher(pool, payTo, entry.Amount, entry.Nonce)
 	if err != nil {
 		return 0, []byte("sign failed")
 	}
