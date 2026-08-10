@@ -1,9 +1,14 @@
+import { useState } from "react";
+
 /**
  * BoxWall — the signature visual. A wall of safe-deposit boxes: one facility,
  * many private compartments, and only yours opens. That is the product in a
  * single image, which a lone safe (custody, one container) never said.
  *
  * `openIndex` is the box that stands open with light inside; null = all sealed.
+ * `interactive` lets the reader open a box by pointing at it — deliberately
+ * ONE at a time, so the page never shows the whole table at once, which is
+ * exactly the guarantee the product makes.
  */
 
 const COLS = 4;
@@ -22,19 +27,38 @@ function cellXY(i: number) {
   };
 }
 
+/** Shares of one pool — uneven on purpose, the way a real award list is. */
+const AMOUNTS = [
+  "1,250", "400", "12,500", "875",
+  "3,000", "250", "6,400", "1,000",
+  "150", "2,750", "500", "9,100",
+];
+
 export default function BoxWall({
   className = "",
   openIndex = null,
+  interactive = false,
+  ticker = "FLR",
 }: {
   className?: string;
   /** Index of the box standing open (0-based), or null for all sealed. */
   openIndex?: number | null;
+  /** Let the reader open a box by hovering or focusing it. */
+  interactive?: boolean;
+  ticker?: string;
 }) {
   const total = COLS * ROWS;
-  const open = openIndex == null ? null : ((openIndex % total) + total) % total;
+  const [pointed, setPointed] = useState<number | null>(null);
+  const base = openIndex == null ? null : ((openIndex % total) + total) % total;
+  // Pointing wins, but only ever one box: no way to see two amounts at once.
+  const open = interactive && pointed != null ? pointed : base;
 
   return (
-    <div className={`relative ${className}`} aria-hidden="true">
+    <div
+      className={`relative ${className}`}
+      aria-hidden={interactive ? undefined : "true"}
+      onMouseLeave={() => setPointed(null)}
+    >
       <svg
         viewBox="0 0 480 380"
         className="h-full w-full"
@@ -93,7 +117,16 @@ export default function BoxWall({
           if (i === open) return null;
           const { x, y } = cellXY(i);
           return (
-            <g key={i}>
+            <g
+              key={i}
+              onMouseEnter={interactive ? () => setPointed(i) : undefined}
+              onFocus={interactive ? () => setPointed(i) : undefined}
+              onBlur={interactive ? () => setPointed(null) : undefined}
+              tabIndex={interactive ? 0 : undefined}
+              role={interactive ? "button" : undefined}
+              aria-label={interactive ? `Open box ${String(i + 1).padStart(2, "0")}` : undefined}
+              className={interactive ? "bw-door cursor-pointer focus:outline-none" : undefined}
+            >
               <rect
                 x={x}
                 y={y}
@@ -179,6 +212,40 @@ export default function BoxWall({
                   fill="url(#bw-spill)"
                   filter="url(#bw-soft)"
                 />
+                {/* the one thing inside: this box's share, and nobody else's */}
+                <rect
+                  x={x + 11}
+                  y={y + 32}
+                  width={CELL_W - 22}
+                  height="38"
+                  rx="2"
+                  fill="#000"
+                  opacity="0.45"
+                />
+                <text
+                  x={x + CELL_W / 2}
+                  y={y + 52}
+                  textAnchor="middle"
+                  fill="#fff"
+                  fontFamily="var(--font-mono)"
+                  fontSize="17"
+                  fontWeight="500"
+                >
+                  {AMOUNTS[open]}
+                </text>
+                <text
+                  x={x + CELL_W / 2}
+                  y={y + 66}
+                  textAnchor="middle"
+                  fill="#fff"
+                  fillOpacity="0.62"
+                  fontFamily="var(--font-mono)"
+                  fontSize="9"
+                  letterSpacing="1.5"
+                >
+                  {ticker}
+                </text>
+
                 {/* door swung open to the right, tapering in perspective */}
                 <path
                   d={`M ${cx} ${y} L ${cx + 40} ${y + 13} L ${cx + 40} ${y + CELL_H - 13} L ${cx} ${y + CELL_H} Z`}
@@ -201,6 +268,13 @@ export default function BoxWall({
       <style>{`
         @keyframes bw-breathe { 0%,100% { opacity: .92; } 50% { opacity: 1; } }
         .bw-open { animation: bw-breathe 5s ease-in-out infinite; }
+        /* Closed doors lift a touch when pointed at, so the wall reads as live. */
+        .bw-door rect:first-of-type { transition: fill-opacity 150ms ease; }
+        .bw-door:hover rect:first-of-type,
+        .bw-door:focus-visible rect:first-of-type { stroke: var(--glow); stroke-opacity: .55; }
+        @media (prefers-reduced-motion: reduce) {
+          .bw-open { animation: none; }
+        }
       `}</style>
     </div>
   );
