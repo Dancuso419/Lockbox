@@ -10,6 +10,7 @@ import AllocationForm from "@/components/AllocationForm";
 import CompliancePanel from "@/components/CompliancePanel";
 import UnclaimedPanel from "@/components/UnclaimedPanel";
 import { readPool } from "@/lib/contracts";
+import Eyebrow from "@/components/Eyebrow";
 
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 
@@ -63,11 +64,11 @@ export default function Organizer() {
   const poolValid = selectedPool && isAddress(selectedPool);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 px-6 py-14">
+    <div className="shell shell-narrow space-y-6 py-16">
       <div className="mb-2">
-        <p className="font-mono text-xs uppercase tracking-widest text-glow">Organizer</p>
-        <h1 className="mt-2 text-3xl font-medium tracking-tight">Run a confidential pool</h1>
-        <p className="mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground">
+        <Eyebrow>Organizer</Eyebrow>
+        <h1 className="font-display mt-5 text-[clamp(2rem,4vw,2.75rem)]">Run a confidential pool</h1>
+        <p className="mt-5 max-w-lg text-sm leading-relaxed text-muted-foreground">
           Fund once, allocate privately inside the TEE, attest the split on-chain, and reveal only
           the non-claimants to yourself after the deadline.
         </p>

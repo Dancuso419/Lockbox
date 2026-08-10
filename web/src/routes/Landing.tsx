@@ -1,256 +1,222 @@
-import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Lock, Eye, ShieldCheck } from "lucide-react";
-import Keyhole from "@/components/Keyhole";
-import Reveal from "@/components/Reveal";
-
-// Scroll progress (0..1) of an element travelling through the viewport.
-// Plain rAF-throttled scroll math — no animation library, no WAAPI.
-function useScrollProgress(ref: React.RefObject<HTMLElement | null>) {
-  const [p, setP] = useState(0);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    let raf = 0;
-    const update = () => {
-      const rect = el.getBoundingClientRect();
-      const total = rect.height - window.innerHeight;
-      setP(total > 0 ? Math.min(1, Math.max(0, -rect.top / total)) : 0);
-    };
-    const onScroll = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(update);
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll);
-    update();
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
-      cancelAnimationFrame(raf);
-    };
-  }, [ref]);
-  return p;
-}
-
-function stepOpacity(p: number, index: number, total: number) {
-  const center = (index + 0.5) / total;
-  return Math.max(0.18, 1 - Math.abs(p - center) * total * 1.05);
-}
-
-const STEPS = [
-  {
-    n: "01",
-    title: "Fund the pool once",
-    body: "The organizer deposits the entire prize in a single public transaction. The total is visible — the split is not.",
-  },
-  {
-    n: "02",
-    title: "Allocate in the dark",
-    body: "Per-recipient amounts are sealed and computed inside a Trusted Execution Environment. No individual allocation ever touches the chain in cleartext.",
-  },
-  {
-    n: "03",
-    title: "Claim only what's yours",
-    body: "Each recipient proves their identity and unlocks a signed voucher for their amount alone. They see their prize — and no one else's.",
-  },
-  {
-    n: "04",
-    title: "Prove without revealing",
-    body: "A TEE-signed attestation lets anyone verify the split balances against the deposit — while every individual amount stays hidden.",
-  },
-];
-
-function Stat({ value, label }: { value: string; label: string }) {
-  return (
-    <div>
-      <div className="font-mono text-2xl font-medium tabular-nums text-foreground sm:text-3xl">{value}</div>
-      <div className="mt-1 text-xs text-muted-foreground">{label}</div>
-    </div>
-  );
-}
+import { ArrowRight, ArrowDown } from "lucide-react";
+import BoxWall from "@/components/BoxWall";
+import LockboxDemo from "@/components/LockboxDemo";
+import Eyebrow from "@/components/Eyebrow";
 
 function Hero() {
   return (
     <section className="relative overflow-hidden">
-      <div className="glow-radial pointer-events-none absolute inset-0 opacity-70" />
-      <div className="grain absolute inset-0" />
-      <div className="relative mx-auto grid min-h-[92vh] max-w-6xl grid-cols-1 items-center gap-10 px-6 py-24 lg:grid-cols-[1.1fr_0.9fr]">
-        <div>
-          <span className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
-            <Lock className="size-3" /> Confidential by construction
-          </span>
-          <h1 className="mt-6 text-[clamp(2.6rem,7vw,5rem)] font-medium leading-[0.98] tracking-tight">
-            <span className="font-light text-muted-foreground">Fund the pool once.</span>
+      {/* Split panel: the right half sits a shade deeper, with a hairline seam. */}
+      <div className="absolute inset-y-0 right-0 hidden w-1/2 bg-surface-2 md:block" />
+      <div className="absolute inset-y-0 left-1/2 hidden w-px bg-border md:block" />
+
+      <div className="shell relative grid grid-cols-1 items-center gap-10 py-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] lg:gap-16 lg:py-16">
+        <div className="lg:pr-10">
+          <Eyebrow>Confidential compute · Flare</Eyebrow>
+          <h1 className="font-display mt-6 text-[clamp(2.75rem,6vw,4.75rem)]">
+            Confidential
             <br />
-            Reveal only what's <span className="italic">yours.</span>
+            prize pools.
           </h1>
-          <p className="mt-6 max-w-md text-base leading-relaxed text-muted-foreground">
-            A prize pool where the organizer allocates privately, recipients claim individually, and
-            no one's share is ever written on-chain in the open.
+          <p className="mt-6 max-w-md text-sm leading-relaxed text-muted-foreground">
+            Fund the pot in the open. Decide the split inside a sealed enclave. Every winner claims
+            their own amount — and <span className="text-foreground">nobody learns anyone else's.</span>
           </p>
-          <div className="mt-9 flex flex-wrap items-center gap-3">
+          <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link
               to="/claim"
-              className="group inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-0.5"
+              className="group inline-flex items-center gap-2 bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-0.5"
             >
               Claim your prize
               <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
             <Link
               to="/organizer"
-              className="inline-flex items-center gap-2 rounded-full border border-border-strong px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+              className="inline-flex items-center gap-2 border border-border-strong px-6 py-3 text-sm font-medium transition-colors hover:bg-accent"
             >
-              Create a pool
+              Run a pool
             </Link>
           </div>
-          <div className="mt-14 flex gap-10 border-t border-border pt-8">
-            <Stat value="0" label="Allocations on-chain" />
-            <Stat value="1:1" label="Voucher per recipient" />
-            <Stat value="TEE" label="Sealed computation" />
+
+          {/* Anchors the bottom of the text column, so the two columns end
+              together instead of leaving a hole under the buttons. */}
+          <div className="mt-14 flex items-center gap-4">
+            <div className="h-0.5 w-24 bg-glow" />
+            <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+              Coston2 testnet
+            </span>
           </div>
         </div>
 
-        <div className="relative mx-auto aspect-[4/5] w-full max-w-sm">
-          <div className="glow-radial absolute inset-0 scale-125 opacity-80" />
-          <Keyhole className="relative h-full w-full" />
+        <div className="relative mx-auto w-full max-w-[34rem]">
+          <BoxWall className="h-full w-full" openIndex={5} />
+        </div>
+      </div>
+
+      {/* Bottom strip — two flat blocks, the way the reference pins its captions */}
+      <div className="shell relative pb-14">
+        <div className="grid gap-px bg-border md:grid-cols-[1fr_1fr_15rem]">
+          <div className="bg-surface p-7">
+            <h2 className="text-sm font-medium">Built for payouts that shouldn't be public.</h2>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              Grant rounds, bug bounties, hackathon placings — the pot audits, the line items stay
+              between you and each recipient.
+            </p>
+          </div>
+          <div className="bg-surface p-7">
+            <h2 className="text-sm font-medium">See it actually encrypt.</h2>
+            <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+              The walkthrough below runs the real thing in your browser — real ciphertext, real
+              signature, no video.
+            </p>
+          </div>
+          <a
+            href="#demo"
+            className="group flex items-center justify-between gap-6 bg-surface p-7 transition-colors hover:bg-accent"
+          >
+            <span className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+              Try it
+            </span>
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-glow text-glow-foreground transition-transform group-hover:translate-y-0.5">
+              <ArrowDown className="size-4" />
+            </span>
+          </a>
         </div>
       </div>
     </section>
   );
 }
 
-function Scrolly() {
-  const ref = useRef<HTMLDivElement>(null);
-  const p = useScrollProgress(ref);
-  const scale = 0.82 + p * 0.5;
+const STEPS: [string, string, string][] = [
+  ["01", "Fund once, in public", "One deposit anyone can audit. The total was never the secret."],
+  ["02", "Allocate in the dark", "Amounts are encrypted in your browser and only opened inside the enclave."],
+  ["03", "Claim one share", "Each recipient unlocks a signed voucher for their own amount alone."],
+  ["04", "Prove it balances", "A signed attestation shows the split sums to the deposit — no breakdown."],
+];
 
+function How() {
   return (
-    <section ref={ref} className="relative md:h-[380vh]">
-      {/* Static stacked fallback on small screens + reduced-motion (no pinning) */}
-      <div className="mx-auto max-w-6xl px-6 py-20 md:hidden">
-        <h2 className="mb-10 font-mono text-xs uppercase tracking-widest text-muted-foreground">
-          How the secret stays a secret
-        </h2>
-        <div className="space-y-8">
-          {STEPS.map((s) => (
-            <div key={s.n} className="border-l border-border-strong py-2 pl-6">
-              <div className="font-mono text-xs text-glow">{s.n}</div>
-              <h3 className="mt-2 text-2xl font-medium tracking-tight">{s.title}</h3>
-              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{s.body}</p>
+    <section id="demo" className="border-t border-border bg-surface-2">
+      <div className="shell py-24">
+        <div>
+          <Eyebrow>Real encryption, running in this tab</Eyebrow>
+          <h2 className="font-display mt-6 max-w-2xl text-[clamp(2rem,4vw,3.25rem)]">
+            Fund it. Seal it.
+            <br />
+            Unlock one share.
+          </h2>
+        </div>
+
+        <div className="mt-14 grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
+          {STEPS.map(([n, title, body]) => (
+            <div key={n} className="bg-surface-2">
+              <div className="h-full p-7">
+                <div className="font-mono text-xs text-glow">{n}</div>
+                <h3 className="mt-3 text-sm font-medium">{title}</h3>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{body}</p>
+              </div>
             </div>
           ))}
         </div>
-      </div>
 
-      {/* Pinned scrollytelling on md+ */}
-      <div className="sticky top-0 hidden h-screen items-center overflow-hidden md:flex motion-reduce:static motion-reduce:h-auto motion-reduce:py-24">
-        <div className="glow-radial pointer-events-none absolute inset-0" />
-        <div className="mx-auto grid w-full max-w-6xl grid-cols-1 items-center gap-8 px-6 lg:grid-cols-2">
-          <div className="relative hidden aspect-square items-center justify-center lg:flex">
-            <div
-              className="glow-radial absolute inset-0 motion-reduce:!opacity-70"
-              style={{ transform: `scale(${scale})`, opacity: 0.4 + p * 0.6 }}
-            />
-            <div
-              className="relative h-[80%] w-[80%] motion-reduce:!scale-100"
-              style={{ transform: `scale(${scale})` }}
-            >
-              <Keyhole className="h-full w-full" />
-            </div>
-          </div>
-          <div>
-            <h2 className="mb-4 font-mono text-sm uppercase tracking-widest text-muted-foreground">
-              How the secret stays a secret
-            </h2>
-            <div className="relative">
-              {STEPS.map((s, i) => (
-                <div
-                  key={s.n}
-                  className="border-l border-border-strong py-8 pl-6 transition-opacity duration-200 motion-reduce:!opacity-100"
-                  style={{ opacity: stepOpacity(p, i, STEPS.length) }}
-                >
-                  <div className="font-mono text-xs text-glow">{s.n}</div>
-                  <h3 className="mt-2 text-2xl font-medium tracking-tight">{s.title}</h3>
-                  <p className="mt-3 max-w-md text-sm leading-relaxed text-muted-foreground">{s.body}</p>
-                </div>
-              ))}
-            </div>
-          </div>
+        <div className="mt-6">
+          <LockboxDemo />
         </div>
       </div>
     </section>
   );
 }
 
-const PRINCIPLES = [
-  {
-    icon: Lock,
-    title: "Sealed allocation",
-    body: "Individual amounts are encrypted to the enclave and computed where no operator — not even the organizer's server — can read them.",
-  },
-  {
-    icon: Eye,
-    title: "Need-to-know claims",
-    body: "A recipient's signed voucher decrypts to exactly one number: their own. Identity and payout can be unlinked with a fresh address.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Verifiable, not visible",
-    body: "An on-chain attestation proves the allocations sum to the deposit. Auditors get certainty; no one gets the breakdown.",
-  },
+const PRINCIPLES: [string, string][] = [
+  [
+    "Sealed allocation",
+    "Amounts are encrypted in the organizer's browser and only opened inside the enclave. No server — not ours, not the organizer's — ever holds the plaintext split.",
+  ],
+  [
+    "Need-to-know claims",
+    "A recipient's voucher decrypts to exactly one number: their own. Claim to a fresh address and even the payout stops pointing back at you.",
+  ],
+  [
+    "Verifiable, not visible",
+    "The enclave signs an attestation that the allocations sum to the deposit, publishable on-chain. Auditors get certainty; nobody gets the breakdown.",
+  ],
 ];
 
 function Principles() {
   return (
-    <section className="mx-auto max-w-6xl px-6 py-24">
-      <Reveal>
-        <h2 className="max-w-2xl text-[clamp(1.8rem,4vw,3rem)] font-medium leading-tight tracking-tight">
-          Confidentiality isn't a setting. It's the architecture.
-        </h2>
-      </Reveal>
-      <div className="mt-14 grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3">
-        {PRINCIPLES.map((p, i) => (
-          <Reveal key={p.title} delay={i * 0.08} className="bg-background">
-            <div className="h-full p-8">
-              <p.icon className="size-5 text-glow" strokeWidth={1.5} />
-              <h3 className="mt-5 text-lg font-medium">{p.title}</h3>
-              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{p.body}</p>
+    <section className="border-t border-border">
+      <div className="shell py-24">
+        <div>
+          <Eyebrow>Why it holds</Eyebrow>
+          <h2 className="font-display mt-6 max-w-2xl text-[clamp(2rem,4vw,3.25rem)]">
+            Confidentiality isn't a setting.
+            <br />
+            It's the architecture.
+          </h2>
+        </div>
+        <div className="mt-14 grid gap-px bg-border md:grid-cols-3">
+          {PRINCIPLES.map(([title, body]) => (
+            <div key={title} className="bg-background">
+              <div className="h-full p-7">
+                <div className="h-0.5 w-8 bg-glow" />
+                <h3 className="mt-5 text-base font-medium">{title}</h3>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{body}</p>
+              </div>
             </div>
-          </Reveal>
-        ))}
+          ))}
+        </div>
       </div>
     </section>
   );
 }
 
+const FACTS: [string, string][] = [
+  ["Network", "Flare · Coston2"],
+  ["Compute", "Flare Confidential Compute (TEE)"],
+  ["Claim proof", "EIP-712 signed voucher"],
+  ["Assets", "Native FLR + ERC-20 / FXRP"],
+];
+
 function CtaFooter() {
   return (
-    <section className="relative overflow-hidden border-t border-border">
-      <div className="glow-radial pointer-events-none absolute inset-0 opacity-60" />
-      <div className="relative mx-auto max-w-3xl px-6 py-28 text-center">
-        <Reveal>
-          <h2 className="text-[clamp(2rem,5vw,3.5rem)] font-medium leading-tight tracking-tight">
-            Step up to the keyhole.
-          </h2>
-          <p className="mx-auto mt-5 max-w-md text-muted-foreground">
-            Explore a live pool, claim an allocation, or stand up your own — the private way.
-          </p>
-          <div className="mt-9 flex flex-wrap justify-center gap-3">
-            <Link
-              to="/pool"
-              className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-0.5"
-            >
-              Explore a pool <ArrowRight className="size-4" />
-            </Link>
-            <Link
-              to="/organizer"
-              className="inline-flex items-center gap-2 rounded-full border border-border-strong px-5 py-2.5 text-sm font-medium transition-colors hover:bg-accent"
-            >
-              Create a pool
-            </Link>
+    <section className="border-t border-border bg-surface-2">
+      <div className="shell py-24">
+        <div className="grid gap-12 lg:grid-cols-[1.1fr_1fr] lg:items-end">
+          <div>
+            <h2 className="font-display text-[clamp(2.25rem,5vw,4rem)]">Open the box.</h2>
+            <p className="mt-5 max-w-sm text-sm text-muted-foreground">
+              Explore a live pool, claim an allocation, or stand up your own — the private way.
+            </p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              <Link
+                to="/pool"
+                className="inline-flex items-center gap-2 bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-0.5"
+              >
+                Explore a pool <ArrowRight className="size-4" />
+              </Link>
+              <Link
+                to="/organizer"
+                className="inline-flex items-center gap-2 border border-border-strong px-6 py-3 text-sm font-medium transition-colors hover:bg-accent"
+              >
+                Run a pool
+              </Link>
+            </div>
           </div>
-        </Reveal>
+
+          <div>
+            <dl className="grid gap-px bg-border sm:grid-cols-2">
+              {FACTS.map(([k, v]) => (
+                <div key={k} className="bg-surface-2 p-5">
+                  <dt className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+                    {k}
+                  </dt>
+                  <dd className="mt-2 text-sm">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -260,7 +226,7 @@ export default function Landing() {
   return (
     <div>
       <Hero />
-      <Scrolly />
+      <How />
       <Principles />
       <CtaFooter />
     </div>

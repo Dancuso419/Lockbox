@@ -1,22 +1,18 @@
-import { Card, CardContent } from "@/components/ui/card";
 import ClaimForm from "@/components/ClaimForm";
+import Eyebrow from "@/components/Eyebrow";
 
 export default function Recipient() {
   return (
-    <div className="mx-auto max-w-xl px-6 py-14">
+    <div className="shell shell-narrow py-16">
       <div className="mb-8">
-        <p className="font-mono text-xs uppercase tracking-widest text-glow">Recipient</p>
-        <h1 className="mt-2 text-3xl font-medium tracking-tight">Claim your prize</h1>
-        <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+        <Eyebrow>Recipient</Eyebrow>
+        <h1 className="font-display mt-5 text-[clamp(2rem,4vw,2.75rem)]">Claim your prize</h1>
+        <p className="mt-5 max-w-lg text-sm leading-relaxed text-muted-foreground">
           Your allocation is sealed inside the TEE. You unlock a voucher for your amount alone —
           no one else's share is ever revealed to you.
         </p>
       </div>
-      <Card>
-        <CardContent className="pt-6">
-          <ClaimForm />
-        </CardContent>
-      </Card>
+      <ClaimForm />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { verifyCompliance } from "@/lib/compliance";
 import { CONFIG } from "@/config";
 import PoolAbi from "@/abi/Pool.json";
 import type { PoolState } from "@/lib/contracts";
+import { Skeleton, ErrorState } from "./States";
 
 // Claimed(address indexed recipient, uint256 amount, uint256 nonce)
 const CLAIMED_EVENT_ABI = {
@@ -52,6 +53,19 @@ interface Props {
   address: `0x${string}`;
 }
 
+/**
+ * viem's read errors are three paragraphs of SDK prose. Say the one thing the
+ * reader can act on; keep the raw text out of the UI.
+ */
+function explainLoadError(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (lower.includes("returned no data") || lower.includes("not a contract"))
+    return "No Lockbox pool lives at this address on Coston2. Check you pasted the pool address (not the factory or your wallet), then retry.";
+  if (lower.includes("network") || lower.includes("fetch") || lower.includes("timeout"))
+    return "Couldn't reach the Coston2 RPC. Check your connection and retry.";
+  return `${raw.slice(0, 200)} Check the address is a Lockbox pool on Coston2, then retry.`;
+}
+
 export default function PublicPoolCard({ address }: Props) {
   const publicClient = usePublicClient();
   const [state, setState] = useState<PoolState | null>(null);
@@ -59,9 +73,12 @@ export default function PublicPoolCard({ address }: Props) {
   const [complianceOk, setComplianceOk] = useState<boolean | null>(null);
   const [claimedLogs, setClaimedLogs] = useState<ClaimedLog[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!publicClient || !isAddress(address)) return;
+    setError(null);
+    setState(null);
 
     let cancelled = false;
 
@@ -151,23 +168,30 @@ export default function PublicPoolCard({ address }: Props) {
 
     load();
     return () => { cancelled = true; };
-  }, [publicClient, address]);
+  }, [publicClient, address, reloadKey]);
 
   if (error) {
     return (
-      <Card className="border-destructive/30">
-        <CardContent className="pt-6">
-          <p className="text-sm text-destructive">{error}</p>
-        </CardContent>
-      </Card>
+      <ErrorState
+        title="Couldn't load this pool"
+        detail={explainLoadError(error)}
+        onRetry={() => setReloadKey((k) => k + 1)}
+      />
     );
   }
 
   if (!state) {
+    // Skeleton mirrors the loaded layout, so nothing jumps when it arrives.
     return (
-      <Card>
-        <CardContent className="pt-6">
-          <p className="text-muted-foreground text-sm animate-pulse">Loading pool…</p>
+      <Card aria-busy="true">
+        <CardContent className="space-y-5">
+          <Skeleton className="h-4 w-40" />
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Skeleton className="h-12" />
+            <Skeleton className="h-12" />
+            <Skeleton className="h-12" />
+          </div>
+          <Skeleton className="h-4 w-56" />
         </CardContent>
       </Card>
     );

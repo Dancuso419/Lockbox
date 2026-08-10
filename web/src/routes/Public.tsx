@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { isAddress } from "viem";
 import { Input } from "@/components/ui/input";
 import PublicPoolCard from "@/components/PublicPoolCard";
+import Eyebrow from "@/components/Eyebrow";
 
 export default function Public() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -19,11 +20,11 @@ export default function Public() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl px-6 py-14 space-y-8">
+    <div className="shell shell-narrow space-y-8 py-16">
       <div>
-        <p className="font-mono text-xs uppercase tracking-widest text-glow">Public</p>
-        <h1 className="mt-2 text-3xl font-medium tracking-tight">Explore a pool</h1>
-        <p className="mt-3 max-w-lg text-sm leading-relaxed text-muted-foreground">
+        <Eyebrow>Public</Eyebrow>
+        <h1 className="font-display mt-5 text-[clamp(2rem,4vw,2.75rem)]">Explore a pool</h1>
+        <p className="mt-5 max-w-lg text-sm leading-relaxed text-muted-foreground">
           Anyone can verify the totals and the compliance attestation. Individual allocations stay
           hidden — that's the whole point.
         </p>

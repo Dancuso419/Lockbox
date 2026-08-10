@@ -14,6 +14,7 @@ import { CONFIG } from "@/config";
 import { poolFactoryConfig } from "@/lib/contracts";
 import { TeeClient } from "@/lib/teeClient";
 import PoolFactoryAbi from "@/abi/PoolFactory.json";
+import { Skeleton, ErrorState } from "./States";
 
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 const ERC20_DECIMALS_ABI = [
@@ -48,14 +49,17 @@ export default function CreatePoolForm({ onPoolCreated }: Props) {
 
   const wrongChain = isConnected && chainId !== CONFIG.chainId;
 
-  // Fetch signer address from TEE on mount
+  // Fetch signer address from TEE on mount (retryable — the BFF may be down)
+  const [signerAttempt, setSignerAttempt] = useState(0);
   useEffect(() => {
     let cancelled = false;
+    setSignerLoading(true);
+    setSignerFailed(false);
     TeeClient.state()
       .then((s) => { if (!cancelled) { setSignerAddress(s.signerAddress); setSignerLoading(false); } })
       .catch(() => { if (!cancelled) { setSignerFailed(true); setSignerLoading(false); } });
     return () => { cancelled = true; };
-  }, []);
+  }, [signerAttempt]);
 
   function validate(): { ok: boolean; totalBigInt: bigint; deadlineBigInt: bigint } {
     let ok = true;
@@ -257,8 +261,14 @@ export default function CreatePoolForm({ onPoolCreated }: Props) {
       {/* Authorized signer (auto-filled from TEE) */}
       <div className="space-y-1">
         <label className="text-sm font-medium text-foreground">Authorized signer <span className="text-muted-foreground font-normal">(TEE, read-only)</span></label>
-        {signerLoading && <p className="text-xs text-muted-foreground animate-pulse">Fetching from TEE…</p>}
-        {signerFailed && <p className="text-xs text-destructive">Failed to fetch TEE signer. BFF may be offline.</p>}
+        {signerLoading && <Skeleton className="h-10 w-full" />}
+        {signerFailed && (
+          <ErrorState
+            title="TEE signer unavailable"
+            detail="The pool needs the enclave's signing address before it can be created. The BFF may be offline — start it and retry."
+            onRetry={() => setSignerAttempt((n) => n + 1)}
+          />
+        )}
         {signerAddress && (
           <Input value={signerAddress} readOnly className="bg-muted font-mono text-sm" />
         )}

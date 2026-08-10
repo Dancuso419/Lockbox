@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from "react";
 import {
   useAccount,
+  useConnect,
   usePublicClient,
   useSignMessage,
   useSwitchChain,
   useWriteContract,
 } from "wagmi";
+import { injected } from "wagmi/connectors";
 import { formatUnits, getAddress, hexToBytes, isAddress } from "viem";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { CONFIG } from "@/config";
@@ -18,6 +19,7 @@ import { poolConfig } from "@/lib/contracts";
 import { TeeClient } from "@/lib/teeClient";
 import { claimChallenge } from "@/lib/challenge";
 import { newEphemeralKey, decryptWith } from "@/lib/ecies";
+import { EmptyState } from "./States";
 
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 
@@ -38,6 +40,7 @@ interface Voucher {
 
 export default function ClaimForm() {
   const { address, chainId, isConnected } = useAccount();
+  const { connect } = useConnect();
   const { switchChain } = useSwitchChain();
   const { signMessageAsync } = useSignMessage();
   const { writeContractAsync } = useWriteContract();
@@ -190,13 +193,18 @@ export default function ClaimForm() {
   // Wallet not connected
   if (!isConnected) {
     return (
-      <Card>
-        <CardContent className="pt-6">
-          <p className="text-muted-foreground text-sm">
-            Connect your wallet (top right) to claim your prize.
-          </p>
-        </CardContent>
-      </Card>
+      <EmptyState
+        title="Connect a wallet to claim"
+        detail="Your wallet signature is what proves to the enclave that an allocation is yours. Nothing is revealed until you sign."
+        action={
+          <button
+            onClick={() => connect({ connector: injected() })}
+            className="bg-primary px-6 py-3 font-mono text-[11px] uppercase tracking-[0.18em] text-primary-foreground transition-transform hover:-translate-y-0.5"
+          >
+            Connect wallet
+          </button>
+        }
+      />
     );
   }
 
