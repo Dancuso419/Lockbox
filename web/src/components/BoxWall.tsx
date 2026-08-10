@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 /**
  * BoxWall — the signature visual. A wall of safe-deposit boxes: one facility,
@@ -34,11 +34,16 @@ const AMOUNTS = [
   "150", "2,750", "500", "9,100",
 ];
 
+/** How far past flat the door swings, in degrees. Past 90° it faces away. */
+const MAX_SWING = 118;
+const SWING_MS = 420;
+
 export default function BoxWall({
   className = "",
   openIndex = null,
   interactive = false,
   ticker = "FLR",
+  amount,
 }: {
   className?: string;
   /** Index of the box standing open (0-based), or null for all sealed. */
@@ -46,12 +51,40 @@ export default function BoxWall({
   /** Let the reader open a box by hovering or focusing it. */
   interactive?: boolean;
   ticker?: string;
+  /** Overrides the decorative amount — pass a real one when you have it. */
+  amount?: string;
 }) {
   const total = COLS * ROWS;
   const [pointed, setPointed] = useState<number | null>(null);
   const base = openIndex == null ? null : ((openIndex % total) + total) % total;
   // Pointing wins, but only ever one box: no way to see two amounts at once.
   const open = interactive && pointed != null ? pointed : base;
+
+  // Swing the door open whenever the open box changes. Moving between boxes
+  // restarts the swing on the new one — the eye follows the opening door, so
+  // there is nothing to gain from animating the one being left behind.
+  const [phase, setPhase] = useState(open == null ? 0 : 1);
+  const rafRef = useRef(0);
+  useEffect(() => {
+    cancelAnimationFrame(rafRef.current);
+    if (open == null) {
+      setPhase(0);
+      return;
+    }
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setPhase(1);
+      return;
+    }
+    const started = performance.now();
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - started) / SWING_MS);
+      setPhase(1 - Math.pow(1 - t, 3)); // ease-out cubic: fast off the latch
+      if (t < 1) rafRef.current = requestAnimationFrame(tick);
+    };
+    setPhase(0);
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [open]);
 
   return (
     <div
@@ -186,11 +219,20 @@ export default function BoxWall({
           );
         })}
 
-        {/* The one open box: cavity, spilling light, and the door swung wide */}
+        {/* The opening box. The door is drawn as the true projection of a panel
+            hinged on its right edge: its free edge travels at -cos(angle) and
+            the top/bottom taper by sin(angle), so it passes edge-on at 90° and
+            swings out the other side. That is what makes it read as a flip
+            rather than a shape being swapped in. */}
         {open != null &&
           (() => {
             const { x, y } = cellXY(open);
             const cx = x + CELL_W;
+            const angle = (phase * MAX_SWING * Math.PI) / 180;
+            const edge = cx - CELL_W * Math.cos(angle); // free edge of the door
+            const taper = 16 * Math.sin(angle); // perspective foreshortening
+            const inside = Math.max(0, (phase - 0.45) / 0.55); // contents fade in
+            const face = Math.max(0, Math.cos(angle)); // door front, until edge-on
             return (
               <g className="bw-open">
                 {/* cavity */}
@@ -202,6 +244,7 @@ export default function BoxWall({
                   height={CELL_H - 8}
                   rx="3"
                   fill="url(#bw-light)"
+                  opacity={phase}
                 />
                 {/* light spilling onto the neighbours */}
                 <ellipse
@@ -211,53 +254,100 @@ export default function BoxWall({
                   ry="66"
                   fill="url(#bw-spill)"
                   filter="url(#bw-soft)"
+                  opacity={phase}
                 />
                 {/* the one thing inside: this box's share, and nobody else's */}
-                <rect
-                  x={x + 11}
-                  y={y + 32}
-                  width={CELL_W - 22}
-                  height="38"
-                  rx="2"
-                  fill="#000"
-                  opacity="0.45"
-                />
-                <text
-                  x={x + CELL_W / 2}
-                  y={y + 52}
-                  textAnchor="middle"
-                  fill="#fff"
-                  fontFamily="var(--font-mono)"
-                  fontSize="17"
-                  fontWeight="500"
-                >
-                  {AMOUNTS[open]}
-                </text>
-                <text
-                  x={x + CELL_W / 2}
-                  y={y + 66}
-                  textAnchor="middle"
-                  fill="#fff"
-                  fillOpacity="0.62"
-                  fontFamily="var(--font-mono)"
-                  fontSize="9"
-                  letterSpacing="1.5"
-                >
-                  {ticker}
-                </text>
+                <g opacity={inside}>
+                  <rect
+                    x={x + 11}
+                    y={y + 32}
+                    width={CELL_W - 22}
+                    height="38"
+                    rx="2"
+                    fill="#000"
+                    opacity="0.45"
+                  />
+                  <text
+                    x={x + CELL_W / 2}
+                    y={y + 52}
+                    textAnchor="middle"
+                    fill="#fff"
+                    fontFamily="var(--font-mono)"
+                    fontSize="17"
+                    fontWeight="500"
+                  >
+                    {amount ?? AMOUNTS[open]}
+                  </text>
+                  <text
+                    x={x + CELL_W / 2}
+                    y={y + 66}
+                    textAnchor="middle"
+                    fill="#fff"
+                    fillOpacity="0.62"
+                    fontFamily="var(--font-mono)"
+                    fontSize="9"
+                    letterSpacing="1.5"
+                  >
+                    {ticker}
+                  </text>
+                </g>
 
-                {/* door swung open to the right, tapering in perspective */}
+                {/* the door itself, mid-swing */}
                 <path
-                  d={`M ${cx} ${y} L ${cx + 40} ${y + 13} L ${cx + 40} ${y + CELL_H - 13} L ${cx} ${y + CELL_H} Z`}
+                  d={`M ${cx} ${y} L ${edge} ${y + taper} L ${edge} ${y + CELL_H - taper} L ${cx} ${y + CELL_H} Z`}
                   fill="url(#bw-swung)"
                   stroke="#fff"
                   strokeOpacity="0.1"
                   strokeWidth="1"
                 />
+                {/* front face turning away from the light as it opens */}
                 <path
-                  d={`M ${cx + 40} ${y + 13} L ${cx + 40} ${y + CELL_H - 13}`}
+                  d={`M ${cx} ${y} L ${edge} ${y + taper} L ${edge} ${y + CELL_H - taper} L ${cx} ${y + CELL_H} Z`}
+                  fill="#000"
+                  opacity={0.28 * phase}
+                />
+                {/* The number and lock ride the door, squashing toward the hinge
+                    until the panel is edge-on — otherwise they'd pop out of
+                    existence the instant the swing starts. */}
+                <g
+                  opacity={face}
+                  transform={`translate(${cx} 0) scale(${Math.max(0.0001, face)} 1) translate(${-cx} 0)`}
+                >
+                  <text
+                    x={x + 14}
+                    y={y + 26}
+                    fill="#fff"
+                    fillOpacity="0.3"
+                    fontFamily="var(--font-mono)"
+                    fontSize="11"
+                    letterSpacing="1"
+                  >
+                    {String(open + 1).padStart(2, "0")}
+                  </text>
+                  <circle cx={x + CELL_W - 22} cy={y + CELL_H / 2} r="6" fill="#000" fillOpacity="0.35" />
+                  <circle
+                    cx={x + CELL_W - 22}
+                    cy={y + CELL_H / 2}
+                    r="6"
+                    fill="none"
+                    stroke="#fff"
+                    strokeOpacity="0.16"
+                    strokeWidth="1"
+                  />
+                  <rect
+                    x={x + CELL_W - 30}
+                    y={y + CELL_H - 26}
+                    width="18"
+                    height="3"
+                    rx="1.5"
+                    fill="#fff"
+                    fillOpacity="0.1"
+                  />
+                </g>
+                <path
+                  d={`M ${edge} ${y + taper} L ${edge} ${y + CELL_H - taper}`}
                   stroke="var(--glow)"
-                  strokeOpacity="0.5"
+                  strokeOpacity={0.5 * phase}
                   strokeWidth="1.5"
                 />
               </g>

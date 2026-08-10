@@ -257,9 +257,13 @@ export default function LockboxDemo() {
 
         {/* Stage: vault + what the chain sees */}
         <div className="bg-surface p-8">
-          <div className="relative mx-auto w-full max-w-[320px]">
+          <div className="relative mx-auto w-full max-w-[380px]">
             <div className="glow-radial absolute inset-0 scale-125" style={{ opacity: revealed ? 0.9 : 0.35 }} />
-            <BoxWall className="relative h-full w-full" openIndex={revealed ? 5 : null} />
+            <BoxWall
+              className="relative h-full w-full"
+              openIndex={revealed ? 5 : null}
+              amount={revealed ? fmt(revealed.amount) : undefined}
+            />
           </div>
 
           <div className="mt-6 border border-border bg-surface-2 px-4 py-3">
