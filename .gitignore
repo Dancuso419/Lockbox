@@ -62,3 +62,6 @@ DEPLOYMENT.md
 
 config/**/*.log
 config/register-tee.state
+# Foundry broadcast logs — deployment records, not source.
+broadcast/
+cache/
