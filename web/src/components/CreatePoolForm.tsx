@@ -15,6 +15,7 @@ import { poolFactoryConfig } from "@/lib/contracts";
 import { TeeClient } from "@/lib/teeClient";
 import PoolFactoryAbi from "@/abi/PoolFactory.json";
 import { Skeleton, ErrorState } from "./States";
+import DeadlineDial from "./DeadlineDial";
 
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 const ERC20_DECIMALS_ABI = [
@@ -249,13 +250,14 @@ export default function CreatePoolForm({ onPoolCreated }: Props) {
         {totalError && <p className="text-xs text-destructive">{totalError}</p>}
       </div>
 
-      {/* Deadline */}
-      <div className="space-y-1">
+      {/* Deadline — set by turning the dial; exact time is behind a toggle. */}
+      <div className="space-y-3">
         <label className="text-sm font-medium text-foreground">Deadline</label>
-        <Input type="datetime-local" value={deadline}
-          onChange={(e) => { setDeadline(e.target.value); setDeadlineError(""); }}
-          className="text-sm" />
-        {deadlineError && <p className="text-xs text-destructive">{deadlineError}</p>}
+        <DeadlineDial
+          value={deadline}
+          onChange={(v) => { setDeadline(v); setDeadlineError(""); }}
+          error={deadlineError}
+        />
       </div>
 
       {/* Authorized signer (auto-filled from TEE) */}
