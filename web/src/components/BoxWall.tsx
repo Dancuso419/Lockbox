@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useReducer, useRef, useState } from "react";
 
 /**
  * BoxWall — the signature visual. A wall of safe-deposit boxes: one facility,
@@ -36,7 +36,16 @@ const AMOUNTS = [
 
 /** How far past flat the door swings, in degrees. Past 90° it faces away. */
 const MAX_SWING = 118;
-const SWING_MS = 420;
+const SWING_MS = 680;
+
+/**
+ * Ease in AND out. A door has mass: it takes a moment to come off the latch
+ * and settles rather than stopping dead. Ease-out alone starts at full speed,
+ * which is what made the swing read as a snap.
+ */
+function easeInOut(t: number) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
 
 export default function BoxWall({
   className = "",
@@ -60,31 +69,80 @@ export default function BoxWall({
   // Pointing wins, but only ever one box: no way to see two amounts at once.
   const open = interactive && pointed != null ? pointed : base;
 
-  // Swing the door open whenever the open box changes. Moving between boxes
-  // restarts the swing on the new one — the eye follows the opening door, so
-  // there is nothing to gain from animating the one being left behind.
-  const [phase, setPhase] = useState(open == null ? 0 : 1);
-  const rafRef = useRef(0);
+  // One slot: the box currently swinging open, with its raw 0..1 progress
+  // (eased at draw time). Animating the outgoing door too was tried and cut —
+  // any dropped frame left it lingering at full open, so two boxes stood open
+  // at once. "One open at a time" is the whole claim this graphic makes, and a
+  // single slot cannot express anything else. The one it replaces snaps shut.
+  const opening = useRef<{ i: number; p: number } | null>(
+    open == null ? null : { i: open, p: 1 }
+  );
+  const [, redraw] = useReducer((n: number) => n + 1, 0);
+
+  if (open !== (opening.current?.i ?? null)) {
+    opening.current = open == null ? null : { i: open, p: 0 };
+  }
+
+  const frameRef = useRef(0);
+  const lastTsRef = useRef(0);
+
+  /** Pointer/keyboard props for a box. Applied to the closed door AND the
+   *  swinging one — a door mid-flight is still the thing under the cursor. */
+  const hover = (i: number) =>
+    interactive
+      ? {
+          onMouseEnter: () => setPointed(i),
+          onFocus: () => setPointed(i),
+          onBlur: () => setPointed(null),
+          tabIndex: 0,
+          role: "button",
+          "aria-label": `Open box ${String(i + 1).padStart(2, "0")}`,
+          className: "bw-door cursor-pointer focus:outline-none",
+        }
+      : {};
+
+  /** The door is still travelling. */
+  function unsettled() {
+    return opening.current != null && opening.current.p < 1;
+  }
+
+  function advance(now: number) {
+    const dt = Math.min(80, now - (lastTsRef.current || now)); // clamp tab-switch jumps
+    lastTsRef.current = now;
+    const step = dt / SWING_MS;
+
+    if (opening.current && opening.current.p < 1) {
+      opening.current = { ...opening.current, p: Math.min(1, opening.current.p + step) };
+    }
+    redraw(); // which re-runs the effect below and arms the next frame
+  }
+
+  // Re-armed from the render path rather than kept alive by the callback
+  // itself: each frame redraws, each redraw re-checks, and a frame that goes
+  // missing for any reason is simply rescheduled on the next render instead of
+  // leaving every door frozen part-way open.
+  //
+  // Deliberately has no dependency list. The lint rule is right that a render
+  // effect calling setState can chain forever — this one cannot: it only arms a
+  // frame while `unsettled()` holds, and every frame moves each door strictly
+  // toward its target until it lands exactly on it, after which nothing is
+  // scheduled. The chain is the animation, and it is finite by construction.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    cancelAnimationFrame(rafRef.current);
-    if (open == null) {
-      setPhase(0);
-      return;
-    }
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      setPhase(1);
+      if (unsettled()) {
+        if (opening.current) opening.current = { ...opening.current, p: 1 };
+        redraw();
+      }
       return;
     }
-    const started = performance.now();
-    const tick = (now: number) => {
-      const t = Math.min(1, (now - started) / SWING_MS);
-      setPhase(1 - Math.pow(1 - t, 3)); // ease-out cubic: fast off the latch
-      if (t < 1) rafRef.current = requestAnimationFrame(tick);
-    };
-    setPhase(0);
-    rafRef.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [open]);
+    if (!unsettled()) {
+      lastTsRef.current = 0; // next swing starts its own clock
+      return;
+    }
+    frameRef.current = requestAnimationFrame(advance);
+    return () => cancelAnimationFrame(frameRef.current);
+  });
 
   return (
     <div
@@ -145,20 +203,14 @@ export default function BoxWall({
         <rect x="0" y="0" width="480" height="356" rx="10" fill="url(#bw-frame)" />
         <rect x="14" y="0" width="452" height="2" rx="1" fill="url(#bw-rim)" />
 
-        {/* Closed doors */}
+        {/* Closed doors — anything not currently swinging */}
         {Array.from({ length: total }).map((_, i) => {
-          if (i === open) return null;
+          if (opening.current?.i === i) return null;
           const { x, y } = cellXY(i);
           return (
             <g
               key={i}
-              onMouseEnter={interactive ? () => setPointed(i) : undefined}
-              onFocus={interactive ? () => setPointed(i) : undefined}
-              onBlur={interactive ? () => setPointed(null) : undefined}
-              tabIndex={interactive ? 0 : undefined}
-              role={interactive ? "button" : undefined}
-              aria-label={interactive ? `Open box ${String(i + 1).padStart(2, "0")}` : undefined}
-              className={interactive ? "bw-door cursor-pointer focus:outline-none" : undefined}
+              {...hover(i)}
             >
               <rect
                 x={x}
@@ -224,17 +276,19 @@ export default function BoxWall({
             the top/bottom taper by sin(angle), so it passes edge-on at 90° and
             swings out the other side. That is what makes it read as a flip
             rather than a shape being swapped in. */}
-        {open != null &&
-          (() => {
-            const { x, y } = cellXY(open);
-            const cx = x + CELL_W;
-            const angle = (phase * MAX_SWING * Math.PI) / 180;
-            const edge = cx - CELL_W * Math.cos(angle); // free edge of the door
-            const taper = 16 * Math.sin(angle); // perspective foreshortening
-            const inside = Math.max(0, (phase - 0.45) / 0.55); // contents fade in
-            const face = Math.max(0, Math.cos(angle)); // door front, until edge-on
-            return (
-              <g className="bw-open">
+        {[opening.current].map((slot) => {
+          if (!slot) return null;
+          const i = slot.i;
+          const phase = easeInOut(slot.p);
+          const { x, y } = cellXY(i);
+          const cx = x + CELL_W;
+          const angle = (phase * MAX_SWING * Math.PI) / 180;
+          const edge = cx - CELL_W * Math.cos(angle); // free edge of the door
+          const taper = 16 * Math.sin(angle); // perspective foreshortening
+          const inside = Math.max(0, (phase - 0.45) / 0.55); // contents fade in
+          const face = Math.max(0, Math.cos(angle)); // door front, until edge-on
+          return (
+            <g key={i} className={phase > 0.99 ? "bw-open" : undefined} {...hover(i)}>
                 {/* cavity */}
                 <rect x={x} y={y} width={CELL_W} height={CELL_H} rx="4" fill="oklch(0.13 0.01 262)" />
                 <rect
@@ -276,7 +330,7 @@ export default function BoxWall({
                     fontSize="17"
                     fontWeight="500"
                   >
-                    {amount ?? AMOUNTS[open]}
+                    {amount ?? AMOUNTS[i]}
                   </text>
                   <text
                     x={x + CELL_W / 2}
@@ -322,7 +376,7 @@ export default function BoxWall({
                     fontSize="11"
                     letterSpacing="1"
                   >
-                    {String(open + 1).padStart(2, "0")}
+                    {String(i + 1).padStart(2, "0")}
                   </text>
                   <circle cx={x + CELL_W - 22} cy={y + CELL_H / 2} r="6" fill="#000" fillOpacity="0.35" />
                   <circle
@@ -350,18 +404,16 @@ export default function BoxWall({
                   strokeOpacity={0.5 * phase}
                   strokeWidth="1.5"
                 />
-              </g>
-            );
-          })()}
+            </g>
+          );
+        })}
       </svg>
 
       <style>{`
         @keyframes bw-breathe { 0%,100% { opacity: .92; } 50% { opacity: 1; } }
         .bw-open { animation: bw-breathe 5s ease-in-out infinite; }
-        /* Closed doors lift a touch when pointed at, so the wall reads as live. */
-        .bw-door rect:first-of-type { transition: fill-opacity 150ms ease; }
-        .bw-door:hover rect:first-of-type,
-        .bw-door:focus-visible rect:first-of-type { stroke: var(--glow); stroke-opacity: .55; }
+        /* The hit rect shows the focus ring; hover is carried by the swing. */
+        .bw-door:focus-visible rect:first-of-type { stroke: var(--glow); stroke-opacity: .8; stroke-width: 2; }
         @media (prefers-reduced-motion: reduce) {
           .bw-open { animation: none; }
         }
