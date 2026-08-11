@@ -36,7 +36,7 @@ const AMOUNTS = [
 
 /** How far past flat the door swings, in degrees. Past 90° it faces away. */
 const MAX_SWING = 118;
-const SWING_MS = 680;
+const SWING_MS = 800;
 
 /**
  * Ease in AND out. A door has mass: it takes a moment to come off the latch
