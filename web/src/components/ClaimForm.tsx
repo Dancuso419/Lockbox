@@ -199,7 +199,7 @@ export default function ClaimForm() {
         action={
           <button
             onClick={() => connect({ connector: injected() })}
-            className="bg-primary px-6 py-3 font-mono text-[11px] uppercase tracking-[0.18em] text-primary-foreground transition-transform hover:-translate-y-0.5"
+            className="rounded-lg bg-primary px-6 py-3 font-mono text-[11px] uppercase tracking-[0.18em] text-primary-foreground transition-transform hover:-translate-y-0.5"
           >
             Connect wallet
           </button>

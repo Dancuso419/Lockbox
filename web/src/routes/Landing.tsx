@@ -26,14 +26,14 @@ function Hero() {
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <Link
               to="/claim"
-              className="group inline-flex items-center gap-2 bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-0.5"
+              className="group inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-0.5"
             >
               Claim your prize
               <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
             </Link>
             <Link
               to="/organizer"
-              className="inline-flex items-center gap-2 border border-border-strong px-6 py-3 text-sm font-medium transition-colors hover:bg-accent"
+              className="inline-flex items-center gap-2 rounded-lg border border-border-strong px-6 py-3 text-sm font-medium transition-colors hover:bg-accent"
             >
               Run a pool
             </Link>
@@ -191,13 +191,13 @@ function CtaFooter() {
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
                 to="/pool"
-                className="inline-flex items-center gap-2 bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-0.5"
+                className="inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-0.5"
               >
                 Explore a pool <ArrowRight className="size-4" />
               </Link>
               <Link
                 to="/organizer"
-                className="inline-flex items-center gap-2 border border-border-strong px-6 py-3 text-sm font-medium transition-colors hover:bg-accent"
+                className="inline-flex items-center gap-2 rounded-lg border border-border-strong px-6 py-3 text-sm font-medium transition-colors hover:bg-accent"
               >
                 Run a pool
               </Link>

@@ -99,7 +99,7 @@ export default function LockboxDemo() {
             key={s}
             onClick={() => (i === 2 && !sealed ? undefined : setStep(i))}
             disabled={i === 2 && !sealed}
-            className={`px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] transition-colors disabled:opacity-40 ${
+            className={`rounded-full px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.14em] transition-colors disabled:opacity-40 ${
               step === i ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground"
             }`}
           >
@@ -130,7 +130,7 @@ export default function LockboxDemo() {
               </div>
               <button
                 onClick={() => setStep(1)}
-                className="group mt-6 inline-flex items-center gap-2 bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-0.5"
+                className="group mt-6 inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-0.5"
               >
                 Now split it privately
                 <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
@@ -180,7 +180,7 @@ export default function LockboxDemo() {
               <button
                 onClick={seal}
                 disabled={overCap || total === 0n}
-                className="group mt-6 inline-flex items-center gap-2 bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-40"
+                className="group mt-6 inline-flex items-center gap-2 rounded-lg bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition-transform hover:-translate-y-0.5 disabled:pointer-events-none disabled:opacity-40"
               >
                 Seal the allocations
                 <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
@@ -200,7 +200,7 @@ export default function LockboxDemo() {
                   <button
                     key={p.label}
                     onClick={() => claim(p.address)}
-                    className={`border px-4 py-2 text-sm transition-colors ${
+                    className={`rounded-full border px-4 py-2 text-sm transition-colors ${
                       claimant === p.address
                         ? "border-glow bg-accent text-foreground"
                         : "border-border-strong text-muted-foreground hover:text-foreground"
@@ -211,7 +211,7 @@ export default function LockboxDemo() {
                 ))}
                 <button
                   onClick={() => claim(OUTSIDER)}
-                  className={`border px-4 py-2 text-sm transition-colors ${
+                  className={`rounded-full border px-4 py-2 text-sm transition-colors ${
                     claimant === OUTSIDER
                       ? "border-destructive/50 bg-accent text-foreground"
                       : "border-border-strong text-muted-foreground hover:text-foreground"
