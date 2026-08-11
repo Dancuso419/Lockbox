@@ -121,9 +121,9 @@ export default function DeadlineDial({
         >
           <defs>
             <linearGradient id="dd-face" x1="0.25" y1="0" x2="0.75" y2="1">
-              <stop offset="0%" stopColor="oklch(0.42 0.010 262)" />
-              <stop offset="45%" stopColor="oklch(0.30 0.011 262)" />
-              <stop offset="100%" stopColor="oklch(0.235 0.011 262)" />
+              <stop offset="0%" stopColor="var(--metal-hi)" />
+              <stop offset="45%" stopColor="var(--metal-mid)" />
+              <stop offset="100%" stopColor="var(--metal-lo)" />
             </linearGradient>
           </defs>
 
@@ -158,13 +158,13 @@ export default function DeadlineDial({
           })}
 
           {/* the wheel */}
-          <circle cx={cx} cy={cy} r="52" fill="url(#dd-face)" stroke="#000" strokeOpacity="0.35" />
-          <circle cx={cx} cy={cy - 1} r="52" fill="none" stroke="#fff" strokeOpacity="0.10" />
-          <circle cx={cx} cy={cy} r="44" fill="none" stroke="#000" strokeOpacity="0.25" />
+          <circle cx={cx} cy={cy} r="52" fill="url(#dd-face)" stroke="var(--border-strong)" />
+          <circle cx={cx} cy={cy - 1} r="52" fill="none" stroke="var(--border)" />
+          <circle cx={cx} cy={cy} r="44" fill="none" stroke="var(--border)" />
 
           {/* grip notch that follows the value */}
           <circle cx={knob.x} cy={knob.y} r="7" fill="var(--glow)" />
-          <circle cx={knob.x} cy={knob.y} r="7" fill="none" stroke="#000" strokeOpacity="0.3" />
+          <circle cx={knob.x} cy={knob.y} r="7" fill="none" stroke="var(--border-strong)" />
 
           <text
             x={cx}
@@ -173,6 +173,7 @@ export default function DeadlineDial({
             className="fill-foreground"
             fontFamily="var(--font-mono)"
             fontSize="30"
+            fontWeight="500"
           >
             {value ? days : "—"}
           </text>

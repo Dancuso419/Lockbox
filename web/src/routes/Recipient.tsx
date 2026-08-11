@@ -31,7 +31,7 @@ export default function Recipient() {
 
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-14">
         {/* The form is the page; it gets the width and the surface. */}
-        <div className="border border-border bg-surface">
+        <div className="overflow-hidden rounded-xl border border-border bg-surface">
           <header className="flex items-baseline gap-4 border-b border-border px-6 py-4">
             <span className="font-mono text-xs text-glow">01</span>
             <h2 className="text-sm font-medium">Unlock your voucher</h2>
@@ -41,7 +41,7 @@ export default function Recipient() {
           </div>
         </div>
 
-        <aside className="space-y-px self-start bg-border">
+        <aside className="space-y-px self-start overflow-hidden rounded-xl bg-border">
           {ASSURANCES.map((a) => (
             <div key={a.title} className="bg-background p-6">
               <a.icon className="size-4 text-glow" strokeWidth={1.6} />

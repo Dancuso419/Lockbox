@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 /** Grey bar standing in for a value that is still loading. */
 export function Skeleton({ className = "" }: { className?: string }) {
-  return <div className={cn("animate-pulse bg-muted", className)} aria-hidden="true" />;
+  return <div className={cn("animate-pulse rounded bg-muted", className)} aria-hidden="true" />;
 }
 
 /**
@@ -23,7 +23,7 @@ export function ErrorState({
   className?: string;
 }) {
   return (
-    <div className={cn("border border-destructive/40 bg-surface p-6", className)} role="alert">
+    <div className={cn("rounded-xl border border-destructive/40 bg-surface p-6", className)} role="alert">
       <div className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.18em] text-destructive">
         <AlertTriangle className="size-3.5" />
         {title}
@@ -56,7 +56,7 @@ export function EmptyState({
   className?: string;
 }) {
   return (
-    <div className={cn("border border-dashed border-border-strong bg-surface p-8 text-center", className)}>
+    <div className={cn("rounded-xl border border-dashed border-border-strong bg-surface p-8 text-center", className)}>
       <p className="text-sm font-medium">{title}</p>
       {detail && <p className="mx-auto mt-2 max-w-sm text-sm text-muted-foreground">{detail}</p>}
       {action && <div className="mt-5 flex justify-center">{action}</div>}

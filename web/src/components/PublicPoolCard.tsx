@@ -227,7 +227,7 @@ export default function PublicPoolCard({ address }: Props) {
           </div>
         </div>
 
-        <div className="mt-6 grid gap-px border border-border bg-border sm:grid-cols-3">
+        <div className="mt-6 grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-3">
           <Stat label="Deposited" value={fmtAmount(state.totalDeposited, decimals)} unit={ticker} />
           <Stat label="Claimed" value={fmtAmount(state.totalClaimed, decimals)} unit={ticker} />
           <Stat label="Remaining" value={fmtAmount(remaining, decimals)} unit={ticker} accent />
@@ -241,7 +241,7 @@ export default function PublicPoolCard({ address }: Props) {
             Compliance attestation
           </h2>
           {state.complianceReported ? (
-            <div className="mt-4 border border-border bg-surface">
+            <div className="mt-4 overflow-hidden rounded-xl border border-border bg-surface">
               <div className="flex flex-wrap items-center gap-3 border-b border-border p-5">
                 {complianceOk === true && (
                   <span className="inline-flex items-center gap-2 border border-success/50 px-3 py-1 font-mono text-[10px] uppercase tracking-[0.18em] text-success">
@@ -276,7 +276,7 @@ export default function PublicPoolCard({ address }: Props) {
               </p>
             </div>
           ) : (
-            <div className="mt-4 border border-dashed border-border-strong bg-surface p-6">
+            <div className="mt-4 rounded-xl border border-dashed border-border-strong bg-surface p-6">
               <p className="text-sm font-medium">Not attested yet</p>
               <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                 The organizer hasn't published the signed report for this pool. Until they do,
@@ -291,7 +291,7 @@ export default function PublicPoolCard({ address }: Props) {
           <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             Pool record
           </h2>
-          <dl className="mt-4 grid gap-px border border-border bg-border sm:grid-cols-2">
+          <dl className="mt-4 grid gap-px overflow-hidden rounded-xl border border-border bg-border sm:grid-cols-2">
             <Field label="Asset">
               {state.asset === ZERO_ADDR ? (
                 "Native (C2FLR)"
@@ -328,7 +328,7 @@ export default function PublicPoolCard({ address }: Props) {
               {claimedLogs.length}
             </span>
           </div>
-          <div className="mt-4 overflow-x-auto border border-border">
+          <div className="mt-4 overflow-x-auto rounded-xl border border-border">
             <table className="w-full min-w-[26rem] text-sm">
               <thead>
                 <tr className="border-b border-border bg-surface">

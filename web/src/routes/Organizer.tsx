@@ -35,7 +35,7 @@ function Step({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} className="scroll-mt-28 border border-border bg-surface">
+    <section id={id} className="scroll-mt-28 overflow-hidden rounded-xl border border-border bg-surface">
       <header className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-border px-6 py-4">
         <span className="font-mono text-xs text-glow">{n}</span>
         <h2 className="text-sm font-medium">{label}</h2>
@@ -195,7 +195,7 @@ export default function Organizer() {
               </Step>
             </>
           ) : (
-            <div className="border border-dashed border-border-strong bg-surface p-8 text-center">
+            <div className="rounded-xl border border-dashed border-border-strong bg-surface p-8 text-center">
               <Lock className="mx-auto size-4 text-muted-foreground" />
               <p className="mt-3 text-sm font-medium">Steps 02–04 need a pool</p>
               <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-muted-foreground">
