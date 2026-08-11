@@ -27,7 +27,7 @@ function WalletButton() {
     return (
       <button
         onClick={() => connect({ connector: injected() })}
-        className="bg-primary px-5 py-2.5 font-mono text-[11px] uppercase tracking-[0.18em] text-primary-foreground transition-transform hover:-translate-y-0.5"
+        className="rounded-full bg-primary px-5 py-2.5 font-mono text-[11px] uppercase tracking-[0.18em] text-primary-foreground transition-transform hover:-translate-y-0.5"
       >
         Connect
       </button>
@@ -38,12 +38,12 @@ function WalletButton() {
       {wrongChain && (
         <button
           onClick={() => switchChain({ chainId: CONFIG.chainId })}
-          className="border border-warning/40 px-3 py-1.5 text-xs font-medium text-warning transition-colors hover:bg-warning/10"
+          className="rounded-full border border-warning/40 px-3 py-1.5 text-xs font-medium text-warning transition-colors hover:bg-warning/10"
         >
           Switch to Coston2
         </button>
       )}
-      <span className="border border-border px-3 py-1.5 font-mono text-xs tabular-nums text-muted-foreground">
+      <span className="rounded-full border border-border px-3 py-1.5 font-mono text-xs tabular-nums text-muted-foreground">
         {address?.slice(0, 6)}…{address?.slice(-4)}
       </span>
       <button
@@ -58,36 +58,40 @@ function WalletButton() {
 
 function TopBar() {
   return (
-    <header className="sticky top-0 z-[1100] border-b border-border bg-background/70 backdrop-blur-xl">
-      <div className="shell flex h-16 items-center justify-between gap-6">
-        <Link to="/" className="flex items-center gap-2.5 text-foreground">
-          <span className="text-glow">
-            <LockboxMark className="size-[18px]" />
-          </span>
-          <span className="font-display text-base font-bold uppercase tracking-[-0.02em]">
-            Lockbox<span className="text-glow">.</span>
-          </span>
-        </Link>
+    // Floating: the bar hovers over the page rather than capping it, so the
+    // wrapper is click-through and only the pill itself takes pointer events.
+    <header className="pointer-events-none fixed inset-x-0 top-0 z-[1100]">
+      <div className="shell pt-4">
+        <div className="pointer-events-auto flex h-14 items-center justify-between gap-6 rounded-full border border-border bg-surface/80 py-2 pl-6 pr-2 shadow-[0_8px_30px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+          <Link to="/" className="flex items-center gap-2.5 text-foreground">
+            <span className="text-glow">
+              <LockboxMark className="size-[18px]" />
+            </span>
+            <span className="font-display text-base font-bold uppercase tracking-[-0.02em]">
+              Lockbox<span className="text-glow">.</span>
+            </span>
+          </Link>
 
-        <nav className="hidden items-center gap-7 md:flex">
-          {NAV.map((n) => (
-            <NavLink
-              key={n.to}
-              to={n.to}
-              className={({ isActive }) =>
-                `font-mono text-[11px] uppercase tracking-[0.18em] transition-colors ${
-                  isActive ? "text-glow" : "text-muted-foreground hover:text-foreground"
-                }`
-              }
-            >
-              {n.label}
-            </NavLink>
-          ))}
-        </nav>
+          <nav className="hidden items-center gap-7 md:flex">
+            {NAV.map((n) => (
+              <NavLink
+                key={n.to}
+                to={n.to}
+                className={({ isActive }) =>
+                  `font-mono text-[11px] uppercase tracking-[0.18em] transition-colors ${
+                    isActive ? "text-glow" : "text-muted-foreground hover:text-foreground"
+                  }`
+                }
+              >
+                {n.label}
+              </NavLink>
+            ))}
+          </nav>
 
-        <div className="flex items-center gap-3">
-          <ThemeToggle />
-          <WalletButton />
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <WalletButton />
+          </div>
         </div>
       </div>
     </header>
@@ -124,7 +128,7 @@ export default function App() {
   return (
     <div className="flex min-h-screen flex-col">
       <TopBar />
-      <main className="flex-1">
+      <main className="flex-1 pt-24">
         <ErrorBoundary>
           <Routes>
             <Route path="/" element={<Landing />} />

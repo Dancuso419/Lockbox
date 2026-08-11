@@ -11,7 +11,7 @@ function Hero() {
       <div className="absolute inset-y-0 right-0 hidden w-1/2 bg-surface-2 md:block" />
       <div className="absolute inset-y-0 left-1/2 hidden w-px bg-border md:block" />
 
-      <div className="shell relative grid grid-cols-1 items-center gap-10 py-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] lg:gap-16 lg:py-16">
+      <div className="shell relative grid grid-cols-1 items-center gap-10 pb-14 pt-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] lg:gap-16 lg:pb-16 lg:pt-6">
         <div className="lg:pr-10">
           <Eyebrow>Confidential compute · Flare</Eyebrow>
           <h1 className="font-display mt-6 text-[clamp(2.75rem,6vw,4.75rem)]">
