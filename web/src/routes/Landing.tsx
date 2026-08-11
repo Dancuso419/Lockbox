@@ -51,9 +51,6 @@ function Hero() {
 
         <div className="relative mx-auto w-full max-w-[34rem]">
           <BoxWall className="h-full w-full" openIndex={5} interactive />
-          <p className="mt-4 text-center font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
-            Point at a box &mdash; one opens at a time
-          </p>
         </div>
       </div>
 
