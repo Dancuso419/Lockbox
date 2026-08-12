@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TeeClient } from "@/lib/teeClient";
 import { encryptToTee } from "@/lib/ecies";
+import { parseHumanAmount } from "@/lib/amount";
 
 interface Row {
   recipient: string;
@@ -15,9 +16,12 @@ interface Row {
 
 interface Props {
   pool: `0x${string}`;
+  /** Decimals of the pool's asset - 18 for native C2FLR, 6 for FXRP. */
+  decimals?: number;
+  ticker?: string;
 }
 
-export default function AllocationForm({ pool }: Props) {
+export default function AllocationForm({ pool, decimals = 18, ticker = "C2FLR" }: Props) {
   const [rows, setRows] = useState<Row[]>([{ recipient: "", amount: "" }]);
   const [csvText, setCsvText] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
@@ -57,9 +61,10 @@ export default function AllocationForm({ pool }: Props) {
     const errs: string[] = [];
     rows.forEach((r, i) => {
       if (!isAddress(r.recipient)) errs.push(`Row ${i + 1}: invalid address`);
-      // base units => positive integer only (no decimal point / scientific notation)
-      if (!/^[0-9]+$/.test(r.amount.trim()) || BigInt(r.amount.trim()) <= 0n) {
-        errs.push(`Row ${i + 1}: amount must be a positive integer (base units)`);
+      if (parseHumanAmount(r.amount, decimals) === null) {
+        errs.push(
+          `Row ${i + 1}: enter an amount greater than zero, at most ${decimals} decimal places`
+        );
       }
     });
     setErrors(errs);
@@ -75,10 +80,12 @@ export default function AllocationForm({ pool }: Props) {
       const state = await TeeClient.state();
 
       // Build allocation JSON — amounts as base-unit decimal strings
+      // The enclave and the contract both work in base units; the organizer
+      // types the amount they mean. Convert once, here.
       const table = {
         allocations: rows.map((r) => ({
           recipient: r.recipient,
-          amount: r.amount.trim(),
+          amount: parseHumanAmount(r.amount, decimals)!.toString(),
         })),
       };
 
@@ -100,9 +107,10 @@ export default function AllocationForm({ pool }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-warning/25 bg-warning/10 px-3 py-2 text-xs text-warning">
-        Amounts must be in <strong>base units</strong> (e.g. 6 decimals for FXRP, 18 for native C2FLR).
-        Do not enter human-readable amounts — the TEE allocates exactly what you enter.
+      <div className="rounded-lg border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+        Amounts are in <strong className="text-foreground">{ticker}</strong> — type{" "}
+        <span className="font-mono">2.5</span> for two and a half. Each row echoes the exact
+        base-unit value that gets sealed to the enclave.
       </div>
 
       {/* Allocation table */}
@@ -111,7 +119,7 @@ export default function AllocationForm({ pool }: Props) {
           <thead className="text-muted-foreground text-xs">
             <tr>
               <th className="text-left pb-1 pr-2">Recipient address</th>
-              <th className="text-left pb-1 pr-2 w-40">Amount (base units)</th>
+              <th className="text-left pb-1 pr-2 w-52">Amount ({ticker})</th>
               <th className="pb-1 w-8"></th>
             </tr>
           </thead>
@@ -123,8 +131,13 @@ export default function AllocationForm({ pool }: Props) {
                     onChange={(e) => updateRow(i, "recipient", e.target.value)} />
                 </td>
                 <td className="pr-2 pb-1">
-                  <Input value={r.amount} placeholder="0" className="font-mono text-xs tabular-nums"
+                  <Input value={r.amount} placeholder="0.0" className="font-mono text-xs tabular-nums"
                     onChange={(e) => updateRow(i, "amount", e.target.value)} />
+                  {parseHumanAmount(r.amount, decimals) !== null && (
+                    <p className="mt-1 font-mono text-[10px] text-muted-foreground">
+                      = {parseHumanAmount(r.amount, decimals)!.toString()} base units
+                    </p>
+                  )}
                 </td>
                 <td className="pb-1">
                   <Button size="sm" variant="ghost" className="px-1 text-destructive hover:text-destructive/80"
@@ -152,7 +165,7 @@ export default function AllocationForm({ pool }: Props) {
         <div className="mt-2 space-y-2">
           <textarea
             className="w-full h-28 rounded-md border border-input bg-background px-3 py-2 text-xs font-mono resize-y focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            placeholder={"0xAbc...,1000000\n0xDef...,2000000"}
+            placeholder={"0xAbc...,2.5\n0xDef...,1"}
             value={csvText}
             onChange={(e) => setCsvText(e.target.value)}
           />

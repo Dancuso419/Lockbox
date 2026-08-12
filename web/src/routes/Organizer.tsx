@@ -185,7 +185,11 @@ export default function Organizer() {
           {poolValid ? (
             <>
               <Step {...STEPS[1]}>
-                <AllocationForm pool={selectedPool!} />
+                <AllocationForm
+                  pool={selectedPool!}
+                  decimals={poolDecimals}
+                  ticker={poolAsset === ZERO_ADDR ? "C2FLR" : "tokens"}
+                />
               </Step>
               <Step {...STEPS[2]}>
                 <CompliancePanel pool={selectedPool!} />

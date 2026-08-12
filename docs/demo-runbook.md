@@ -123,20 +123,18 @@ Skip if you're using the pool above.
 1. **`/organizer`** → paste the pool address into **Work on an existing pool** →
    **Load**. Steps 02–04 unlock.
 2. Scroll to **02 Submit allocation**.
-3. **Amounts are in base units — and this is the opposite of the create form.**
-   Watch out: §2 step 3 takes a *human* amount (`5` means 5 C2FLR, it scales for
-   you), while this form takes raw integers and scales nothing. Native C2FLR has
-   18 decimals, so 1 C2FLR is `1000000000000000000`. Type `5` here and you
-   allocate 5 wei. The enclave allocates exactly the integer you give it.
+3. **Amounts are in C2FLR** — type `2.5` for two and a half, the same as the
+   create form. Each row echoes the exact base-unit value that will be sealed,
+   so you can see what the enclave actually receives.
 4. Enter your **recipient account** address and an amount. Two rows is a better
    demo than one, because it shows that a claimant sees only their own row:
 
-   | Recipient address | Amount (base units) |
+   | Recipient address | Amount (C2FLR) |
    | --- | --- |
-   | `0x…your recipient` | `2000000000000000000` (2 C2FLR) |
-   | `0x…any other addr` | `1000000000000000000` (1 C2FLR) |
+   | `0x…your recipient` | `2` |
+   | `0x…any other addr` | `1` |
 
-   The sum must be ≤ the deposit; the contract rejects over-allocation.
+   The sum must be at most the deposit; the contract rejects over-allocation.
 5. **Submit allocation.**
 
    No MetaMask prompt here — this is the confidential step. The amounts are
