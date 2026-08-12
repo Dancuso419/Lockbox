@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { usePublicClient } from "wagmi";
+import { useAccount, usePublicClient } from "wagmi";
 import { isAddress } from "viem";
 import { Check, ChevronLeft, ChevronRight, Lock } from "lucide-react";
 
@@ -9,6 +9,8 @@ import AllocationForm from "@/components/AllocationForm";
 import CompliancePanel from "@/components/CompliancePanel";
 import UnclaimedPanel from "@/components/UnclaimedPanel";
 import PageHeader from "@/components/PageHeader";
+import PoolPicker from "@/components/PoolPicker";
+import { rememberPool } from "@/lib/myPools";
 import { readPool } from "@/lib/contracts";
 
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000" as `0x${string}`;
@@ -22,6 +24,7 @@ const STEPS = [
 
 export default function Organizer() {
   const publicClient = usePublicClient();
+  const { address: wallet } = useAccount();
 
   const [poolInput, setPoolInput] = useState("");
   const [selectedPool, setSelectedPool] = useState<`0x${string}` | null>(null);
@@ -52,6 +55,7 @@ export default function Organizer() {
   function applyPool(addr: `0x${string}`) {
     setSelectedPool(addr);
     setPoolInput(addr);
+    rememberPool(wallet, addr);
     // A fresh pool is a fresh lifecycle — don't carry the last one's progress.
     setAllocated(null);
     setAttested(false);
@@ -174,6 +178,9 @@ export default function Organizer() {
               >
                 Load
               </button>
+            </div>
+            <div className="mt-2">
+              <PoolPicker owner={wallet} current={selectedPool} onSelect={applyPool} />
             </div>
           </div>
         }
