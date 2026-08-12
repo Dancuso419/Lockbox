@@ -9,9 +9,11 @@ import { TeeClient } from "@/lib/teeClient";
 
 interface Props {
   pool: `0x${string}`;
+  /** Fired once the report is on-chain. */
+  onPublished?: () => void;
 }
 
-export default function CompliancePanel({ pool }: Props) {
+export default function CompliancePanel({ pool, onPublished }: Props) {
   const { writeContractAsync } = useWriteContract();
   const publicClient = usePublicClient();
   const [loading, setLoading] = useState(false);
@@ -32,6 +34,7 @@ export default function CompliancePanel({ pool }: Props) {
 
       await publicClient.waitForTransactionReceipt({ hash });
       setResult({ txHash: hash, recipientCount, totalAllocated });
+      onPublished?.();
       toast.success("Compliance report published on-chain.");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { usePublicClient } from "wagmi";
 import { isAddress } from "viem";
-import { Lock } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Lock } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import CreatePoolForm from "@/components/CreatePoolForm";
@@ -14,39 +14,11 @@ import { readPool } from "@/lib/contracts";
 const ZERO_ADDR = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 
 const STEPS = [
-  { n: "01", id: "create", label: "Create pool", note: "Fund it once, in the open" },
-  { n: "02", id: "allocate", label: "Submit allocation", note: "Sealed to the enclave" },
-  { n: "03", id: "attest", label: "Publish attestation", note: "Prove the split balances" },
-  { n: "04", id: "sweep", label: "Unclaimed funds", note: "After the deadline" },
+  { n: "01", label: "Create pool", note: "Fund it once, in the open" },
+  { n: "02", label: "Submit allocation", note: "Sealed to the enclave" },
+  { n: "03", label: "Publish attestation", note: "Prove the split balances" },
+  { n: "04", label: "Unclaimed funds", note: "After the deadline" },
 ] as const;
-
-/** One step of the workspace: a numbered band with the form beneath it. */
-function Step({
-  n,
-  id,
-  label,
-  note,
-  children,
-}: {
-  n: string;
-  id: string;
-  label: string;
-  note: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section id={id} className="scroll-mt-28 overflow-hidden rounded-xl border border-border bg-surface">
-      <header className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-border px-6 py-4">
-        <span className="font-mono text-xs text-glow">{n}</span>
-        <h2 className="text-sm font-medium">{label}</h2>
-        <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-          {note}
-        </span>
-      </header>
-      <div className="p-6">{children}</div>
-    </section>
-  );
-}
 
 export default function Organizer() {
   const publicClient = usePublicClient();
@@ -54,13 +26,37 @@ export default function Organizer() {
   const [poolInput, setPoolInput] = useState("");
   const [selectedPool, setSelectedPool] = useState<`0x${string}` | null>(null);
 
-  // resolved for UnclaimedPanel display
+  // resolved for the allocation + unclaimed panels
   const [poolDecimals, setPoolDecimals] = useState(18);
   const [poolAsset, setPoolAsset] = useState<`0x${string}` | undefined>(undefined);
+
+  // Which card is showing, and which way we last travelled — the direction is
+  // what tells forward apart from back without reading the heading.
+  const [step, setStep] = useState(0);
+  const [dir, setDir] = useState<1 | -1>(1);
+
+  // Completion is driven by what actually happened, not by having visited a step.
+  const [allocated, setAllocated] = useState<number | null>(null);
+  const [attested, setAttested] = useState(false);
+
+  const poolValid = Boolean(selectedPool && isAddress(selectedPool));
+  const done = [poolValid, allocated !== null, attested, false];
+
+  function goTo(next: number) {
+    if (next === step || next < 0 || next > 3) return;
+    if (next > 0 && !poolValid) return; // 02-04 need a pool
+    setDir(next > step ? 1 : -1);
+    setStep(next);
+  }
 
   function applyPool(addr: `0x${string}`) {
     setSelectedPool(addr);
     setPoolInput(addr);
+    // A fresh pool is a fresh lifecycle — don't carry the last one's progress.
+    setAllocated(null);
+    setAttested(false);
+    setDir(1);
+    setStep(1);
   }
 
   // When pool is selected, resolve decimals (same pattern as ClaimForm/PublicPoolCard)
@@ -95,7 +91,57 @@ export default function Organizer() {
     return () => { cancelled = true; };
   }, [publicClient, selectedPool]);
 
-  const poolValid = Boolean(selectedPool && isAddress(selectedPool));
+  const ticker = poolAsset === ZERO_ADDR ? "C2FLR" : "tokens";
+
+  // Only one panel is ever on screen, so this is a switch rather than an array
+  // of elements waiting for keys they will never need.
+  function renderPanel() {
+    if (step > 0 && !poolValid) {
+      return (
+        <div className="py-6 text-center">
+          <Lock className="mx-auto size-4 text-muted-foreground" />
+          <p className="mt-3 text-sm font-medium">This step needs a pool</p>
+          <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-muted-foreground">
+            Create one in step 01, or load an existing pool address above.
+          </p>
+        </div>
+      );
+    }
+    switch (step) {
+      case 0:
+        return <CreatePoolForm onPoolCreated={applyPool} />;
+      case 1:
+        return (
+          <AllocationForm
+            pool={selectedPool!}
+            decimals={poolDecimals}
+            ticker={ticker}
+            onSubmitted={(count) => {
+              setAllocated(count);
+              setDir(1);
+              setStep(2);
+            }}
+          />
+        );
+      case 2:
+        return (
+          <CompliancePanel
+            pool={selectedPool!}
+            onPublished={() => {
+              setAttested(true);
+              setDir(1);
+              setStep(3);
+            }}
+          />
+        );
+      default:
+        return (
+          <UnclaimedPanel pool={selectedPool!} decimals={poolDecimals} asset={poolAsset} />
+        );
+    }
+  }
+
+  const current = STEPS[step];
 
   return (
     <div className="shell space-y-12 py-16">
@@ -134,8 +180,7 @@ export default function Organizer() {
       />
 
       <div className="grid gap-10 lg:grid-cols-[15rem_minmax(0,1fr)] lg:gap-14">
-        {/* The lifecycle, always visible, so it's clear what comes next and
-            what is still locked behind choosing a pool. */}
+        {/* The lifecycle: where you are, what is done, what is still locked. */}
         <nav className="lg:sticky lg:top-28 lg:self-start">
           <h2 className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
             Lifecycle
@@ -143,21 +188,28 @@ export default function Organizer() {
           <ol className="mt-4 space-y-px bg-border">
             {STEPS.map((s, i) => {
               const locked = i > 0 && !poolValid;
+              const active = i === step;
               return (
-                <li key={s.id} className="bg-background">
-                  <a
-                    href={locked ? undefined : `#${s.id}`}
-                    aria-disabled={locked}
-                    className={`flex items-baseline gap-3 py-3 transition-colors ${
+                <li key={s.n} className="bg-background">
+                  <button
+                    onClick={() => goTo(i)}
+                    disabled={locked}
+                    aria-current={active ? "step" : undefined}
+                    className={`flex w-full items-baseline gap-3 py-3 text-left transition-colors ${
                       locked
                         ? "cursor-default text-muted-foreground/50"
-                        : "text-foreground hover:text-glow"
+                        : active
+                          ? "text-foreground"
+                          : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    <span className="font-mono text-xs text-glow">{s.n}</span>
-                    <span className="text-sm">{s.label}</span>
+                    <span className={`font-mono text-xs ${active ? "text-glow" : "text-glow/70"}`}>
+                      {s.n}
+                    </span>
+                    <span className={`text-sm ${active ? "font-medium" : ""}`}>{s.label}</span>
+                    {done[i] && <Check className="ml-auto size-3.5 shrink-0 self-center text-success" />}
                     {locked && <Lock className="ml-auto size-3 shrink-0 self-center" />}
-                  </a>
+                  </button>
                 </li>
               );
             })}
@@ -177,37 +229,51 @@ export default function Organizer() {
           </div>
         </nav>
 
-        <div className="space-y-6">
-          <Step {...STEPS[0]}>
-            <CreatePoolForm onPoolCreated={applyPool} />
-          </Step>
+        <div>
+          {/* One card at a time. Keyed by step so it remounts and replays the
+              slide; the class picks the side it enters from. */}
+          <section
+            key={step}
+            className={`overflow-hidden rounded-xl border border-border bg-surface ${
+              dir === 1 ? "step-forward" : "step-back"
+            }`}
+          >
+            <header className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-border px-6 py-4">
+              <span className="font-mono text-xs text-glow">{current.n}</span>
+              <h2 className="text-sm font-medium">{current.label}</h2>
+              {done[step] && (
+                <span className="inline-flex items-center gap-1 text-xs text-success">
+                  <Check className="size-3" /> done
+                </span>
+              )}
+              <span className="ml-auto font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                {current.note}
+              </span>
+            </header>
 
-          {poolValid ? (
-            <>
-              <Step {...STEPS[1]}>
-                <AllocationForm
-                  pool={selectedPool!}
-                  decimals={poolDecimals}
-                  ticker={poolAsset === ZERO_ADDR ? "C2FLR" : "tokens"}
-                />
-              </Step>
-              <Step {...STEPS[2]}>
-                <CompliancePanel pool={selectedPool!} />
-              </Step>
-              <Step {...STEPS[3]}>
-                <UnclaimedPanel pool={selectedPool!} decimals={poolDecimals} asset={poolAsset} />
-              </Step>
-            </>
-          ) : (
-            <div className="rounded-xl border border-dashed border-border-strong bg-surface p-8 text-center">
-              <Lock className="mx-auto size-4 text-muted-foreground" />
-              <p className="mt-3 text-sm font-medium">Steps 02–04 need a pool</p>
-              <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-muted-foreground">
-                Create one above and it becomes active automatically, or load an existing pool
-                address to pick up where you left off.
-              </p>
-            </div>
-          )}
+            <div className="p-6">{renderPanel()}</div>
+          </section>
+
+          {/* Move between steps by hand as well as automatically. */}
+          <div className="mt-4 flex items-center justify-between">
+            <button
+              onClick={() => goTo(step - 1)}
+              disabled={step === 0}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border-strong px-4 py-2 text-sm transition-colors hover:bg-accent disabled:opacity-30"
+            >
+              <ChevronLeft className="size-4" /> Back
+            </button>
+            <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground">
+              Step {step + 1} of {STEPS.length}
+            </span>
+            <button
+              onClick={() => goTo(step + 1)}
+              disabled={step === 3 || !poolValid}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border-strong px-4 py-2 text-sm transition-colors hover:bg-accent disabled:opacity-30"
+            >
+              Next <ChevronRight className="size-4" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

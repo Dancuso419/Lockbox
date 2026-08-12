@@ -19,9 +19,11 @@ interface Props {
   /** Decimals of the pool's asset - 18 for native C2FLR, 6 for FXRP. */
   decimals?: number;
   ticker?: string;
+  /** Fired when the enclave confirms the allocation, so the stepper can move on. */
+  onSubmitted?: (count: number) => void;
 }
 
-export default function AllocationForm({ pool, decimals = 18, ticker = "C2FLR" }: Props) {
+export default function AllocationForm({ pool, decimals = 18, ticker = "C2FLR", onSubmitted }: Props) {
   const [rows, setRows] = useState<Row[]>([{ recipient: "", amount: "" }]);
   const [csvText, setCsvText] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
@@ -96,6 +98,7 @@ export default function AllocationForm({ pool, decimals = 18, ticker = "C2FLR" }
 
       const { count } = await TeeClient.submitAllocation(pool, ciphertextHex);
       setSubmittedCount(count);
+      onSubmitted?.(count);
       toast.success(`Allocation submitted — ${count} recipient(s) registered.`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
