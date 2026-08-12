@@ -64,6 +64,9 @@ export default function ClaimForm() {
   const [verifying, setVerifying] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [txHash, setTxHash] = useState<string | null>(null);
+  // The contract already knows whether this allocation was spent — its nonce is
+  // fixed per allocation, so usedNonce is the authoritative "already claimed".
+  const [alreadyClaimed, setAlreadyClaimed] = useState(false);
 
   const wrongChain = isConnected && chainId !== CONFIG.chainId;
 
@@ -133,6 +136,7 @@ export default function ClaimForm() {
     setVerifying(true);
     setVoucher(null);
     setTxHash(null);
+    setAlreadyClaimed(false);
     ephPrivRef.current = null;
 
     try {
@@ -161,6 +165,21 @@ export default function ClaimForm() {
 
       const parsed: Voucher = JSON.parse(new TextDecoder().decode(decrypted));
       setVoucher(parsed);
+
+      // Ask the pool whether this voucher has already been spent, so a second
+      // visit shows "claimed" instead of a button that can only revert.
+      try {
+        const spent = (await publicClient?.readContract({
+          ...poolConfig(pool as `0x${string}`),
+          functionName: "usedNonce",
+          args: [BigInt(parsed.nonce)],
+        })) as boolean;
+        setAlreadyClaimed(Boolean(spent));
+      } catch {
+        // ponytail: a failed read just leaves the button enabled; the contract
+        // still rejects a double claim.
+        setAlreadyClaimed(false);
+      }
     } catch (e) {
       const raw = e instanceof Error ? e.message : String(e);
       toast.error(mapTeeError(raw));
@@ -181,6 +200,7 @@ export default function ClaimForm() {
         args: [BigInt(voucher.amount), BigInt(voucher.nonce), voucher.signature],
       });
       setTxHash(hash);
+      setAlreadyClaimed(true);
       toast.success("Claimed on-chain!");
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -301,13 +321,22 @@ export default function ClaimForm() {
             </p>
           )}
 
-          <Button
-            onClick={handleClaimOnChain}
-            disabled={claiming}
-            className="w-full"
-          >
-            {claiming ? "Submitting…" : "Claim on-chain"}
-          </Button>
+          {alreadyClaimed ? (
+            <div className="rounded-lg border border-border bg-surface px-3 py-2 text-sm">
+              <span className="font-medium text-success">Already claimed.</span>{" "}
+              <span className="text-muted-foreground">
+                This allocation has been paid out — the pool rejects a second claim on it.
+              </span>
+            </div>
+          ) : (
+            <Button
+              onClick={handleClaimOnChain}
+              disabled={claiming}
+              className="w-full"
+            >
+              {claiming ? "Submitting…" : "Claim on-chain"}
+            </Button>
+          )}
 
           {txHash && (
             <p className="text-xs text-success">
