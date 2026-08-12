@@ -1,0 +1,29 @@
+# The extension node, standalone.
+#
+# The scaffold normally runs this behind tee-proxy + redis, which exist to carry
+# on-chain instruction delivery. That path is blocked upstream (TEE registration
+# never completes on Coston2), and the browser reaches the handlers through the
+# BFF instead — so neither is needed here. cmd/main.go wants only a signing key
+# and an RPC URL.
+#
+# NOTE: this is the simulated-TEE posture, same as local development. It is a
+# demo deployment, not an enclave: confidentiality here rests on the host, not
+# on hardware attestation. Say so plainly wherever it is presented.
+FROM golang:1.25-alpine AS build
+WORKDIR /src
+
+COPY go/go.mod go/go.sum ./
+RUN go mod download
+
+COPY go/ ./
+RUN CGO_ENABLED=0 go build -trimpath -o /out/node ./cmd
+
+FROM alpine:3.20
+RUN adduser -D -u 10001 app
+COPY --from=build /out/node /usr/local/bin/node
+USER app
+
+# Render injects PORT; the node reads EXTENSION_PORT.
+ENV EXTENSION_PORT=7702
+EXPOSE 7702
+CMD ["sh", "-c", "EXTENSION_PORT=${PORT:-7702} exec /usr/local/bin/node"]

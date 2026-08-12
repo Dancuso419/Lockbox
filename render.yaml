@@ -1,0 +1,43 @@
+# Render blueprint: the enclave node and the BFF.
+#
+# Two services, no Redis and no tee-proxy — those carry on-chain instruction
+# delivery, which is blocked upstream by TEE registration, and the browser path
+# does not touch them.
+#
+# Read this before deploying:
+#   * Allocations live in the node's memory. Render restarts on every deploy and
+#     spins free instances down when idle, and each restart empties the table —
+#     the organizer must re-submit. That is safe (nonces are derived from the
+#     enclave secret, so a re-submission reproduces the same ones and an already
+#     spent voucher stays spent), but a claim will fail until they do.
+#   * VOUCHER_SIGNING_KEY must be set by hand in the dashboard and must stay
+#     stable: its address is what every pool is bound to as authorizedSigner.
+#     Change it and every existing pool becomes unclaimable.
+services:
+  - type: web
+    name: lockbox-node
+    runtime: docker
+    dockerfilePath: ./deploy/Dockerfile.node
+    plan: free
+    healthCheckPath: /state
+    envVars:
+      - key: VOUCHER_SIGNING_KEY
+        sync: false # set in the dashboard; never in git
+      - key: CHAIN_ID
+        value: "114"
+      - key: CHAIN_URL
+        value: https://coston2-api.flare.network/ext/C/rpc
+
+  - type: web
+    name: lockbox-bff
+    runtime: docker
+    dockerfilePath: ./deploy/Dockerfile.bff
+    plan: free
+    envVars:
+      - key: EXT_NODE_URL
+        fromService:
+          name: lockbox-node
+          type: web
+          property: hostport
+      - key: ALLOWED_ORIGIN
+        sync: false # the Vercel origin, once it exists
