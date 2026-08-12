@@ -213,6 +213,7 @@ minutes out if you want it on camera.
 | --- | --- | --- |
 | `TEE signer unavailable` on /organizer | BFF down, or pointing at the proxy for `/state` | Check `curl localhost:8081/api/state`; set `EXT_NODE_URL=http://localhost:7702` |
 | Container exits: `signer: invalid length, need 256 bits` | `VOUCHER_SIGNING_KEY` missing from `.env` | Add a 32-byte hex key (no `0x`), restart services |
+| `cannot unmarshal number into ... ActionResult` | BFF posting actions at the proxy instead of the node | `EXT_NODE_URL` must be set; the node serves both `/state` and `/action` |
 | `not eligible` on claim | Wrong wallet, wrong pool, or the enclave restarted since §3 | Confirm the account matches a row from §3; if the enclave restarted, redo §3 |
 | Claim reverts on-chain | Pool's `authorizedSigner` isn't the running enclave | `cast call <pool> 'authorizedSigner()(address)'` must equal `/api/state`'s `signerAddress` |
 | Attestation says invalid signature | Pool bound to a different signer | Same check as above |

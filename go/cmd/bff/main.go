@@ -22,9 +22,10 @@ func extProxyURL() string {
 	return "http://localhost:8080"
 }
 
-// The extension node's own address. Its /state carries the signer address the
-// organizer must bind a pool to, and the tee-proxy does not relay that route —
-// so it is reached directly rather than through EXT_PROXY_URL.
+// The extension node's own address. Both routes the BFF needs live here — /state
+// (the signer address a pool binds to) and /action (the handlers themselves).
+// The tee-proxy relays neither; it carries on-chain instruction delivery, which
+// is the path that stays blocked by TEE registration.
 func extNodeURL() string {
 	if v := os.Getenv("EXT_NODE_URL"); v != "" {
 		return v
@@ -70,7 +71,11 @@ func forward(w http.ResponseWriter, action teetypes.Action) {
 		return
 	}
 
-	resp, err := http.Post(extProxyURL()+"/action", "application/json", bytes.NewReader(body)) //nolint:gosec
+	// Actions go to the extension node, not the tee-proxy: /action is the node's
+	// own route. Posting to the proxy returned "404 page not found", whose
+	// leading 404 the JSON decoder read as a number — "cannot unmarshal number
+	// into ActionResult" is what that mistake looks like from the browser.
+	resp, err := http.Post(extNodeURL()+"/action", "application/json", bytes.NewReader(body)) //nolint:gosec
 	if err != nil {
 		http.Error(w, "tee unavailable", http.StatusBadGateway)
 		return
@@ -225,7 +230,7 @@ func main() {
 
 	port := bffPort()
 	addr := fmt.Sprintf(":%s", port)
-	log.Printf("BFF listening on %s → %s", addr, extProxyURL())
+	log.Printf("BFF listening on %s → node %s (proxy %s)", addr, extNodeURL(), extProxyURL())
 	if err := http.ListenAndServe(addr, cors(mux)); err != nil { //nolint:gosec
 		log.Fatalf("server: %v", err)
 	}
