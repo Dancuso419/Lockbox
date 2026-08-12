@@ -16,7 +16,7 @@ import (
 
 func TestComplianceReport_SignsAggregate(t *testing.T) {
 	sgn, _ := signer.NewFromHex("353c43dada1ebc390f9594ed91753446e19389ae545fc7fada020816346efb73", big.NewInt(114))
-	st := allocations.New()
+	st := allocations.New([]byte("test-nonce-secret"))
 	e := &Extension{signer: sgn, store: st, reader: fakeReader{total: big.NewInt(10)}}
 
 	pool := common.Address{19: 1}
@@ -47,7 +47,7 @@ func TestComplianceReport_SignsAggregate(t *testing.T) {
 
 func TestComplianceReport_UnknownPoolRejected(t *testing.T) {
 	sgn, _ := signer.NewFromHex("353c43dada1ebc390f9594ed91753446e19389ae545fc7fada020816346efb73", big.NewInt(114))
-	e := &Extension{signer: sgn, store: allocations.New(), reader: fakeReader{total: big.NewInt(10)}}
+	e := &Extension{signer: sgn, store: allocations.New([]byte("test-nonce-secret")), reader: fakeReader{total: big.NewInt(10)}}
 	status, _ := e.handleComplianceReport(context.Background(), common.Address{19: 9})
 	if status != 0 {
 		t.Fatal("expected rejection for pool with no allocations")

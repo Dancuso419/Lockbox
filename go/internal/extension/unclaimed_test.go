@@ -50,7 +50,7 @@ func TestUnclaimedReportHappyPath(t *testing.T) {
 
 	sgn, _ := signer.NewFromHex("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", big.NewInt(114))
 
-	store := allocations.New()
+	store := allocations.New([]byte("test-nonce-secret"))
 	pool := common.HexToAddress("0x1111111111111111111111111111111111111111")
 	r1 := common.HexToAddress("0xaaaa000000000000000000000000000000000001")
 	r2 := common.HexToAddress("0xaaaa000000000000000000000000000000000002")
@@ -109,7 +109,7 @@ func TestUnclaimedReportHappyPath(t *testing.T) {
 
 func TestUnclaimedReportRejectsNonOrganizer(t *testing.T) {
 	sgn, _ := signer.NewFromHex("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", big.NewInt(114))
-	store := allocations.New()
+	store := allocations.New([]byte("test-nonce-secret"))
 	pool := common.HexToAddress("0x1111111111111111111111111111111111111111")
 	_ = store.Submit(pool, []allocations.Input{
 		{Recipient: common.HexToAddress("0xaaaa000000000000000000000000000000000001"), Amount: big.NewInt(10)},
@@ -144,7 +144,7 @@ func TestUnclaimedReportUnknownPool(t *testing.T) {
 	orgPubHex := "0x" + common.Bytes2Hex(crypto.FromECDSAPub(&orgPk.PublicKey))
 
 	sgn, _ := signer.NewFromHex("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80", big.NewInt(114))
-	store := allocations.New()
+	store := allocations.New([]byte("test-nonce-secret"))
 	pool := common.HexToAddress("0x2222222222222222222222222222222222222222")
 	reader := &fakePoolReader{deposit: big.NewInt(0), organizer: organizer, used: map[string]bool{}}
 	e := New(0, 0, sgn, store, reader)

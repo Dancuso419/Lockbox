@@ -3,12 +3,12 @@
 package allocations
 
 import (
-	"crypto/rand"
 	"fmt"
 	"math/big"
 	"sync"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 )
 
 type Input struct {
@@ -23,22 +23,33 @@ type Entry struct {
 }
 
 type Store struct {
-	mu    sync.RWMutex
-	pools map[common.Address]map[common.Address]*Entry
+	mu     sync.RWMutex
+	pools  map[common.Address]map[common.Address]*Entry
+	secret []byte
 }
 
-func New() *Store {
-	return &Store{pools: make(map[common.Address]map[common.Address]*Entry)}
-}
-
-// randomNonce returns a random 256-bit nonce. Random (not sequential) so the
-// on-chain nonce reveals nothing about a recipient's position in the table.
-func randomNonce() (*big.Int, error) {
-	var b [32]byte
-	if _, err := rand.Read(b[:]); err != nil {
-		return nil, err
+// New builds a store. `secret` keys the nonce derivation — pass the enclave's
+// signer secret (see signer.NonceSecret).
+func New(secret []byte) *Store {
+	return &Store{
+		pools:  make(map[common.Address]map[common.Address]*Entry),
+		secret: secret,
 	}
-	return new(big.Int).SetBytes(b[:]), nil
+}
+
+// deriveNonce produces this pool+recipient's nonce.
+//
+// Deterministic rather than random, and that difference matters: the table
+// lives in enclave memory only, so a restart loses it and the organizer has to
+// re-submit. With random nonces the re-submission minted fresh ones, the
+// contract had only ever marked the old ones spent, and anyone who had already
+// claimed could claim a second time. Deriving from a secret the enclave holds
+// keeps the nonce unguessable from outside — so it still leaks nothing about
+// position in the table — while making a re-submission reproduce exactly the
+// nonces already on-chain.
+func (s *Store) deriveNonce(pool, recipient common.Address) *big.Int {
+	h := crypto.Keccak256(s.secret, pool.Bytes(), recipient.Bytes())
+	return new(big.Int).SetBytes(h)
 }
 
 // Submit validates and stores a pool's allocations. Allocations are immutable:
@@ -61,14 +72,11 @@ func (s *Store) Submit(pool common.Address, entries []Input, total *big.Int) err
 		if _, dup := table[in.Recipient]; dup {
 			return fmt.Errorf("duplicate recipient")
 		}
-		nonce, err := randomNonce()
-		if err != nil {
-			return fmt.Errorf("nonce gen: %w", err)
-		}
-		for seenNonce[nonce.String()] {
-			if nonce, err = randomNonce(); err != nil {
-				return fmt.Errorf("nonce gen: %w", err)
-			}
+		nonce := s.deriveNonce(pool, in.Recipient)
+		// Distinct recipients give distinct preimages, so a collision here means
+		// something is badly wrong rather than merely unlucky.
+		if seenNonce[nonce.String()] {
+			return fmt.Errorf("nonce collision for %s", in.Recipient.Hex())
 		}
 		seenNonce[nonce.String()] = true
 		table[in.Recipient] = &Entry{Amount: new(big.Int).Set(in.Amount), Nonce: nonce}

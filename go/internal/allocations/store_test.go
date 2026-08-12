@@ -10,7 +10,7 @@ import (
 func addr(b byte) common.Address { return common.Address{19: b} }
 
 func TestSubmit_HappyPath(t *testing.T) {
-	s := New()
+	s := New([]byte("test-nonce-secret"))
 	pool := addr(1)
 	entries := []Input{{Recipient: addr(0xA), Amount: big.NewInt(3)}, {Recipient: addr(0xB), Amount: big.NewInt(5)}}
 	if err := s.Submit(pool, entries, big.NewInt(10)); err != nil {
@@ -27,7 +27,7 @@ func TestSubmit_HappyPath(t *testing.T) {
 }
 
 func TestSubmit_RejectsOverDeposit(t *testing.T) {
-	s := New()
+	s := New([]byte("test-nonce-secret"))
 	entries := []Input{{Recipient: addr(0xA), Amount: big.NewInt(11)}}
 	if err := s.Submit(addr(1), entries, big.NewInt(10)); err == nil {
 		t.Fatal("expected over-deposit rejection")
@@ -35,7 +35,7 @@ func TestSubmit_RejectsOverDeposit(t *testing.T) {
 }
 
 func TestSubmit_RejectsZeroAmountAndDuplicate(t *testing.T) {
-	s := New()
+	s := New([]byte("test-nonce-secret"))
 	if err := s.Submit(addr(1), []Input{{Recipient: addr(0xA), Amount: big.NewInt(0)}}, big.NewInt(10)); err == nil {
 		t.Fatal("expected zero-amount rejection")
 	}
@@ -46,7 +46,7 @@ func TestSubmit_RejectsZeroAmountAndDuplicate(t *testing.T) {
 }
 
 func TestSubmit_SecondSubmitRejected(t *testing.T) {
-	s := New()
+	s := New([]byte("test-nonce-secret"))
 	pool := addr(1)
 	_ = s.Submit(pool, []Input{{Recipient: addr(0xA), Amount: big.NewInt(1)}}, big.NewInt(10))
 	if err := s.Submit(pool, []Input{{Recipient: addr(0xB), Amount: big.NewInt(1)}}, big.NewInt(10)); err == nil {
@@ -55,7 +55,7 @@ func TestSubmit_SecondSubmitRejected(t *testing.T) {
 }
 
 func TestSubmit_NoncesAreRandomNotSequential(t *testing.T) {
-	s := New()
+	s := New([]byte("test-nonce-secret"))
 	pool := addr(1)
 	entries := []Input{
 		{Recipient: addr(0xA), Amount: big.NewInt(1)},
@@ -84,7 +84,7 @@ func TestSubmit_NoncesAreRandomNotSequential(t *testing.T) {
 }
 
 func TestLookup_IsolatesPools(t *testing.T) {
-	s := New()
+	s := New([]byte("test-nonce-secret"))
 	_ = s.Submit(addr(1), []Input{{Recipient: addr(0xA), Amount: big.NewInt(1)}}, big.NewInt(10))
 	if _, ok := s.Lookup(addr(2), addr(0xA)); ok {
 		t.Fatal("lookup should not cross pools")
@@ -92,7 +92,7 @@ func TestLookup_IsolatesPools(t *testing.T) {
 }
 
 func TestTotals_SumsAndCounts(t *testing.T) {
-	s := New()
+	s := New([]byte("test-nonce-secret"))
 	pool := addr(1)
 	_ = s.Submit(pool, []Input{
 		{Recipient: addr(0xA), Amount: big.NewInt(3)},
@@ -109,7 +109,7 @@ func TestTotals_SumsAndCounts(t *testing.T) {
 }
 
 func TestEntriesReturnsAllRowsAndIsCopySafe(t *testing.T) {
-	s := New()
+	s := New([]byte("test-nonce-secret"))
 	pool := common.HexToAddress("0x1111111111111111111111111111111111111111")
 	r1 := common.HexToAddress("0xaaaa000000000000000000000000000000000001")
 	r2 := common.HexToAddress("0xaaaa000000000000000000000000000000000002")
@@ -148,5 +148,61 @@ func TestEntriesReturnsAllRowsAndIsCopySafe(t *testing.T) {
 
 	if _, ok := s.Entries(common.HexToAddress("0x02")); ok {
 		t.Fatal("unknown pool should be ok=false")
+	}
+}
+
+// The table lives in enclave memory, so a restart loses it and the organizer
+// re-submits. These are the properties that make that safe.
+func TestNoncesSurviveARestart(t *testing.T) {
+	secret := []byte("enclave-secret")
+	pool := common.HexToAddress("0x1111111111111111111111111111111111111111")
+	alice := common.HexToAddress("0xa11ce00000000000000000000000000000000000")
+	bob := common.HexToAddress("0xb0b0000000000000000000000000000000000000")
+	entries := []Input{
+		{Recipient: alice, Amount: big.NewInt(3)},
+		{Recipient: bob, Amount: big.NewInt(2)},
+	}
+
+	first := New(secret)
+	if err := first.Submit(pool, entries, big.NewInt(5)); err != nil {
+		t.Fatalf("submit: %v", err)
+	}
+	before, _ := first.Lookup(pool, alice)
+
+	// A fresh store is exactly what a restarted enclave has.
+	second := New(secret)
+	if err := second.Submit(pool, entries, big.NewInt(5)); err != nil {
+		t.Fatalf("resubmit: %v", err)
+	}
+	after, _ := second.Lookup(pool, alice)
+
+	if before.Nonce.Cmp(after.Nonce) != 0 {
+		t.Fatalf("nonce changed across restart: %s then %s — a spent voucher would come back to life",
+			before.Nonce, after.Nonce)
+	}
+}
+
+func TestNoncesDifferPerRecipientPoolAndEnclave(t *testing.T) {
+	poolA := common.HexToAddress("0x1111111111111111111111111111111111111111")
+	poolB := common.HexToAddress("0x2222222222222222222222222222222222222222")
+	alice := common.HexToAddress("0xa11ce00000000000000000000000000000000000")
+	bob := common.HexToAddress("0xb0b0000000000000000000000000000000000000")
+
+	s := New([]byte("secret-one"))
+	other := New([]byte("secret-two"))
+
+	aliceA := s.deriveNonce(poolA, alice)
+	bobA := s.deriveNonce(poolA, bob)
+	aliceB := s.deriveNonce(poolB, alice)
+	aliceOther := other.deriveNonce(poolA, alice)
+
+	if aliceA.Cmp(bobA) == 0 {
+		t.Fatal("two recipients in one pool share a nonce")
+	}
+	if aliceA.Cmp(aliceB) == 0 {
+		t.Fatal("the same recipient reuses a nonce across pools")
+	}
+	if aliceA.Cmp(aliceOther) == 0 {
+		t.Fatal("nonce does not depend on the enclave secret — it would be guessable")
 	}
 }

@@ -24,7 +24,7 @@ func challengeMessage(pool common.Address, recipientPubHex, claimAddr string) st
 func TestClaimVerify_ReturnsEncryptedVoucher(t *testing.T) {
 	teeKey := "353c43dada1ebc390f9594ed91753446e19389ae545fc7fada020816346efb73"
 	sgn, _ := signer.NewFromHex(teeKey, big.NewInt(114))
-	st := allocations.New()
+	st := allocations.New([]byte("test-nonce-secret"))
 	e := &Extension{signer: sgn, store: st, reader: fakeReader{total: big.NewInt(10)}}
 
 	rk, _ := crypto.HexToECDSA("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
@@ -82,7 +82,7 @@ func TestClaimVerify_ReturnsEncryptedVoucher(t *testing.T) {
 
 func TestClaimVerify_UnknownRecipientRejected(t *testing.T) {
 	sgn, _ := signer.NewFromHex("353c43dada1ebc390f9594ed91753446e19389ae545fc7fada020816346efb73", big.NewInt(114))
-	e := &Extension{signer: sgn, store: allocations.New(), reader: fakeReader{total: big.NewInt(10)}}
+	e := &Extension{signer: sgn, store: allocations.New([]byte("test-nonce-secret")), reader: fakeReader{total: big.NewInt(10)}}
 	rk, _ := crypto.HexToECDSA("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
 	recipientPub := "0x" + common.Bytes2Hex(crypto.FromECDSAPub(&rk.PublicKey))
 	pool := common.Address{19: 9}
@@ -98,7 +98,7 @@ func TestClaimVerify_UnknownRecipientRejected(t *testing.T) {
 
 func TestClaimVerify_WrongPoolChallengeRejected(t *testing.T) {
 	sgn, _ := signer.NewFromHex("353c43dada1ebc390f9594ed91753446e19389ae545fc7fada020816346efb73", big.NewInt(114))
-	st := allocations.New()
+	st := allocations.New([]byte("test-nonce-secret"))
 	e := &Extension{signer: sgn, store: st, reader: fakeReader{total: big.NewInt(10)}}
 
 	rk, _ := crypto.HexToECDSA("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
@@ -127,7 +127,7 @@ func TestClaimVerify_WrongPoolChallengeRejected(t *testing.T) {
 func TestClaimVerify_FreshClaimAddress(t *testing.T) {
 	teeKey := "353c43dada1ebc390f9594ed91753446e19389ae545fc7fada020816346efb73"
 	sgn, _ := signer.NewFromHex(teeKey, big.NewInt(114))
-	st := allocations.New()
+	st := allocations.New([]byte("test-nonce-secret"))
 	e := &Extension{signer: sgn, store: st, reader: fakeReader{total: big.NewInt(10)}}
 
 	rk, _ := crypto.HexToECDSA("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
@@ -184,7 +184,7 @@ func TestClaimVerify_FreshClaimAddress(t *testing.T) {
 
 func TestClaimVerify_BadClaimAddressRejected(t *testing.T) {
 	sgn, _ := signer.NewFromHex("353c43dada1ebc390f9594ed91753446e19389ae545fc7fada020816346efb73", big.NewInt(114))
-	st := allocations.New()
+	st := allocations.New([]byte("test-nonce-secret"))
 	e := &Extension{signer: sgn, store: st, reader: fakeReader{total: big.NewInt(10)}}
 	rk, _ := crypto.HexToECDSA("ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80")
 	identity := crypto.PubkeyToAddress(rk.PublicKey)
@@ -206,7 +206,7 @@ func TestClaimVerify_BadClaimAddressRejected(t *testing.T) {
 
 func TestClaimVerify_MalformedChallengeSigRejected(t *testing.T) {
 	sgn, _ := signer.NewFromHex("353c43dada1ebc390f9594ed91753446e19389ae545fc7fada020816346efb73", big.NewInt(114))
-	e := &Extension{signer: sgn, store: allocations.New(), reader: fakeReader{total: big.NewInt(10)}}
+	e := &Extension{signer: sgn, store: allocations.New([]byte("test-nonce-secret")), reader: fakeReader{total: big.NewInt(10)}}
 	pool := common.Address{19: 1}
 	// too-short sig
 	pb, _ := json.Marshal(types.ClaimVerifyPayload{RecipientPubHex: "0x04", ChallengeSig: "0x1234"})

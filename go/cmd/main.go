@@ -22,7 +22,7 @@ func main() {
 	if err != nil {
 		logger.Fatalf("signer: %v", err)
 	}
-	store := allocations.New()
+	store := allocations.New(sgn.NonceSecret())
 	rdr, err := chain.Dial(config.ChainURL())
 	if err != nil {
 		logger.Fatalf("chain dial: %v", err)

@@ -43,6 +43,15 @@ func NewFromHex(hexKey string, chainID *big.Int) (*Signer, error) {
 
 func (s *Signer) Address() common.Address { return s.addr }
 
+// NonceSecret returns a key for deriving allocation nonces, domain-separated
+// from signing so it can never collide with a voucher digest. It is derived
+// from the enclave's private key, which means nonces are stable across
+// restarts — a re-submitted allocation reproduces the nonces the contract has
+// already seen, so a voucher that was spent stays spent.
+func (s *Signer) NonceSecret() []byte {
+	return crypto.Keccak256([]byte("ConfidentialPrizePool/nonce/v1"), crypto.FromECDSA(s.key))
+}
+
 func word(b []byte) []byte { return common.LeftPadBytes(b, 32) }
 
 func (s *Signer) domainSeparator(pool common.Address) []byte {

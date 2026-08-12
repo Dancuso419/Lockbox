@@ -28,7 +28,7 @@ func (f fakeReader) UsedNonce(ctx context.Context, pool common.Address, nonce *b
 
 func TestSubmitAllocation_StoresAndHidesAmounts(t *testing.T) {
 	sgn, _ := signer.NewFromHex("353c43dada1ebc390f9594ed91753446e19389ae545fc7fada020816346efb73", big.NewInt(114))
-	st := allocations.New()
+	st := allocations.New([]byte("test-nonce-secret"))
 	e := &Extension{signer: sgn, store: st, reader: fakeReader{total: big.NewInt(10)}}
 
 	pool := common.Address{19: 1}
@@ -53,7 +53,7 @@ func TestSubmitAllocation_StoresAndHidesAmounts(t *testing.T) {
 
 func TestSubmitAllocation_RejectsOverDeposit(t *testing.T) {
 	sgn, _ := signer.NewFromHex("353c43dada1ebc390f9594ed91753446e19389ae545fc7fada020816346efb73", big.NewInt(114))
-	e := &Extension{signer: sgn, store: allocations.New(), reader: fakeReader{total: big.NewInt(2)}}
+	e := &Extension{signer: sgn, store: allocations.New([]byte("test-nonce-secret")), reader: fakeReader{total: big.NewInt(2)}}
 	pool := common.Address{19: 1}
 	table := types.AllocationTable{Allocations: []types.AllocationItem{{Recipient: common.Address{19: 0xA}.Hex(), Amount: "5"}}}
 	plain, _ := json.Marshal(table)
@@ -66,7 +66,7 @@ func TestSubmitAllocation_RejectsOverDeposit(t *testing.T) {
 
 func TestSubmitAllocation_TamperedCiphertextRejected(t *testing.T) {
 	sgn, _ := signer.NewFromHex("353c43dada1ebc390f9594ed91753446e19389ae545fc7fada020816346efb73", big.NewInt(114))
-	e := &Extension{signer: sgn, store: allocations.New(), reader: fakeReader{total: big.NewInt(10)}}
+	e := &Extension{signer: sgn, store: allocations.New([]byte("test-nonce-secret")), reader: fakeReader{total: big.NewInt(10)}}
 	pool := common.Address{19: 1}
 	if status, _ := e.handleSubmitAllocation(context.Background(), pool, []byte("not a valid ecies ciphertext")); status != 0 {
 		t.Fatal("expected tampered/garbage ciphertext rejected")
