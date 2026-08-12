@@ -271,6 +271,40 @@
 }
 
 /*
+  Wizard cards flip on their vertical axis: forward turns in from the right-hand
+  edge, back from the left, so the direction of travel is read from the motion
+  rather than from the heading. The stage carries the perspective — without it a
+  rotateY is just a horizontal squash.
+*/
+.step-stage {
+  perspective: 1600px;
+}
+@keyframes step-flip-forward {
+  from { opacity: 0; transform: rotateY(-72deg); }
+  60%  { opacity: 1; }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes step-flip-back {
+  from { opacity: 0; transform: rotateY(72deg); }
+  60%  { opacity: 1; }
+  to   { opacity: 1; transform: none; }
+}
+.step-forward {
+  transform-origin: left center;
+  backface-visibility: hidden;
+  animation: step-flip-forward 480ms var(--ease-out-quint) both;
+}
+.step-back {
+  transform-origin: right center;
+  backface-visibility: hidden;
+  animation: step-flip-back 480ms var(--ease-out-quint) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .step-forward,
+  .step-back { animation: none; }
+}
+
+/*
   Theme switch. The outgoing theme is held still underneath while the incoming
   one is wiped in by a circle growing from the switch — cross-fading the two
   instead just muddies every colour on the way through.

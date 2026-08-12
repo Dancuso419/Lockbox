@@ -229,9 +229,9 @@ export default function Organizer() {
           </div>
         </nav>
 
-        <div>
+        <div className="step-stage">
           {/* One card at a time. Keyed by step so it remounts and replays the
-              slide; the class picks the side it enters from. */}
+              flip; the class picks the edge it turns in from. */}
           <section
             key={step}
             className={`overflow-hidden rounded-xl border border-border bg-surface ${
