@@ -53,6 +53,18 @@ services:
       - EXTENSION_PORT=7702
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
       - SIMULATED_TEE=${SIMULATED_TEE:-true}
+      # secp256k1 key the enclave signs vouchers and compliance reports with.
+      # Set it in .env (gitignored) — the node refuses to start without a valid
+      # 256-bit key, and its address is what a pool takes as authorizedSigner.
+      # Stable across restarts on purpose: the simulated TEE's own keypair is
+      # regenerated every boot, which would orphan every pool created earlier.
+      - VOUCHER_SIGNING_KEY=${VOUCHER_SIGNING_KEY:-}
+      - CHAIN_URL=${CHAIN_URL:-}
+    ports:
+      # The extension's own /state (signer address + pubkey) — the BFF reads it
+      # from here. The tee-proxy does not relay it, so without this mapping the
+      # organizer flow cannot learn which signer to bind a pool to.
+      - "${EXTENSION_PORT_HOST:-7702}:7702"
     depends_on:
       - ext-proxy
 

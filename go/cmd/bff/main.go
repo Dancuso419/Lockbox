@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -21,6 +20,16 @@ func extProxyURL() string {
 		return v
 	}
 	return "http://localhost:8080"
+}
+
+// The extension node's own address. Its /state carries the signer address the
+// organizer must bind a pool to, and the tee-proxy does not relay that route —
+// so it is reached directly rather than through EXT_PROXY_URL.
+func extNodeURL() string {
+	if v := os.Getenv("EXT_NODE_URL"); v != "" {
+		return v
+	}
+	return "http://localhost:7702"
 }
 
 func allowedOrigin() string {
@@ -84,15 +93,32 @@ func forward(w http.ResponseWriter, action teetypes.Action) {
 }
 
 func handleGetState(w http.ResponseWriter, r *http.Request) {
-	resp, err := http.Get(extProxyURL() + "/state") //nolint:gosec
+	resp, err := http.Get(extNodeURL() + "/state") //nolint:gosec
 	if err != nil {
 		http.Error(w, "tee unavailable", http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		http.Error(w, "tee state unavailable", http.StatusBadGateway)
+		return
+	}
+
+	// The node wraps its state in an envelope ({stateVersion, state}); the
+	// browser wants the signer address and pubkey at the top level. Unwrap here
+	// rather than in the client — this shim exists to speak the TEE's protocol
+	// so the front end does not have to.
+	var envelope struct {
+		State types.State `json:"state"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&envelope); err != nil {
+		http.Error(w, "decode tee state: "+err.Error(), http.StatusBadGateway)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(resp.StatusCode)
-	io.Copy(w, resp.Body) //nolint:errcheck
+	if err := json.NewEncoder(w).Encode(envelope.State); err != nil {
+		log.Printf("write state: %v", err)
+	}
 }
 
 func handleSubmitAllocation(w http.ResponseWriter, r *http.Request) {
