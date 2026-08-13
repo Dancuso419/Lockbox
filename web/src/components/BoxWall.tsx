@@ -92,6 +92,10 @@ export default function BoxWall({
     interactive
       ? {
           onMouseEnter: () => setPointed(i),
+          // Touch never fires mouseenter on a tap — only on a press-and-hold —
+          // so a phone needed a long press to open a box. Click covers tap,
+          // mouse and keyboard activation alike.
+          onClick: () => setPointed(i),
           onFocus: () => setPointed(i),
           onBlur: () => setPointed(null),
           tabIndex: 0,

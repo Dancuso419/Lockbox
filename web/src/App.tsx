@@ -1,4 +1,6 @@
-import { Routes, Route, NavLink, Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Routes, Route, NavLink, Link, useLocation } from "react-router-dom";
+import { ChevronDown } from "lucide-react";
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { CONFIG } from "./config";
@@ -56,6 +58,60 @@ function WalletButton() {
   );
 }
 
+/**
+ * Narrow screens get a labelled dropdown rather than a hamburger: three items
+ * do not need to be hidden behind an unlabelled icon, and naming the current
+ * section means the bar says where you are as well as where you can go.
+ */
+function MobileMenu() {
+  const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
+  const current = NAV.find((n) => n.to === pathname);
+
+  // A tap that navigates should also close the menu.
+  useEffect(() => setOpen(false), [pathname]);
+
+  return (
+    <div className="relative md:hidden">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground"
+      >
+        {current ? current.label : "Menu"}
+        <ChevronDown className={`size-3 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <>
+          {/* Tapping anywhere else dismisses it. */}
+          <div className="fixed inset-0 z-[1150]" onClick={() => setOpen(false)} />
+          <nav
+            role="menu"
+            className="absolute left-0 z-[1200] mt-2 w-44 overflow-hidden rounded-xl border border-border bg-surface shadow-[0_12px_40px_rgba(0,0,0,0.3)]"
+          >
+            {NAV.map((n) => (
+              <NavLink
+                key={n.to}
+                to={n.to}
+                role="menuitem"
+                className={({ isActive }) =>
+                  `block border-b border-border px-4 py-3 font-mono text-[11px] uppercase tracking-[0.18em] last:border-0 transition-colors ${
+                    isActive ? "text-glow" : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                  }`
+                }
+              >
+                {n.label}
+              </NavLink>
+            ))}
+          </nav>
+        </>
+      )}
+    </div>
+  );
+}
+
 function TopBar() {
   return (
     // Floating: the bar hovers over the page rather than capping it, so the
@@ -89,6 +145,7 @@ function TopBar() {
           </nav>
 
           <div className="flex items-center gap-2">
+            <MobileMenu />
             <ThemeToggle />
             <WalletButton />
           </div>
