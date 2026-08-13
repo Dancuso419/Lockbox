@@ -2,7 +2,7 @@
 
 | Piece | URL | What it is |
 | --- | --- | --- |
-| Web app | https://lockbox-eight-orcin.vercel.app | Vercel, built from `web/` on every push to `main` |
+| Web app | https://lockbox-eight-orcin.vercel.app | Vercel, auto-deploys from `Dancuso419/Lockbox` on every push to `main`, root directory `web` |
 | BFF | https://lockbox-bff.onrender.com | Render, `deploy/Dockerfile.bff` — speaks the TEE action protocol, holds no keys |
 | Enclave node | https://lockbox-node.onrender.com | Render, `deploy/Dockerfile.node` — signs vouchers, holds the allocation table |
 | Contracts | Coston2 (chain 114) | factory `0x8F2eb4B78877DD6052609E5815FfCb583d19053F` |
