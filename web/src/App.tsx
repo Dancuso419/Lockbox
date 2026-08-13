@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
-import { Routes, Route, NavLink, Link, useLocation } from "react-router-dom";
-import { ChevronDown } from "lucide-react";
+import { Routes, Route, NavLink, Link } from "react-router-dom";
+import { Compass, SlidersHorizontal, KeyRound } from "lucide-react";
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { CONFIG } from "./config";
@@ -13,9 +12,9 @@ import Organizer from "./routes/Organizer";
 import Recipient from "./routes/Recipient";
 
 const NAV = [
-  { to: "/pool", label: "Explore" },
-  { to: "/organizer", label: "Organizer" },
-  { to: "/claim", label: "Claim" },
+  { to: "/pool", label: "Explore", icon: Compass },
+  { to: "/organizer", label: "Organizer", icon: SlidersHorizontal },
+  { to: "/claim", label: "Claim", icon: KeyRound },
 ];
 
 function WalletButton() {
@@ -59,56 +58,45 @@ function WalletButton() {
 }
 
 /**
- * Narrow screens get a labelled dropdown rather than a hamburger: three items
- * do not need to be hidden behind an unlabelled icon, and naming the current
- * section means the bar says where you are as well as where you can go.
+ * On a phone the sections live in a bottom bar, within thumb reach, rather than
+ * behind anything that has to be opened first. Hidden from md up, where the
+ * header nav takes over.
  */
-function MobileMenu() {
-  const [open, setOpen] = useState(false);
-  const { pathname } = useLocation();
-  const current = NAV.find((n) => n.to === pathname);
-
-  // A tap that navigates should also close the menu.
-  useEffect(() => setOpen(false), [pathname]);
-
+function BottomNav() {
   return (
-    <div className="relative md:hidden">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 font-mono text-[11px] uppercase tracking-[0.18em] text-muted-foreground transition-colors hover:text-foreground"
-      >
-        {current ? current.label : "Menu"}
-        <ChevronDown className={`size-3 transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-
-      {open && (
-        <>
-          {/* Tapping anywhere else dismisses it. */}
-          <div className="fixed inset-0 z-[1150]" onClick={() => setOpen(false)} />
-          <nav
-            role="menu"
-            className="absolute left-0 z-[1200] mt-2 w-44 overflow-hidden rounded-xl border border-border bg-surface shadow-[0_12px_40px_rgba(0,0,0,0.3)]"
-          >
-            {NAV.map((n) => (
-              <NavLink
-                key={n.to}
-                to={n.to}
-                role="menuitem"
-                className={({ isActive }) =>
-                  `block border-b border-border px-4 py-3 font-mono text-[11px] uppercase tracking-[0.18em] last:border-0 transition-colors ${
-                    isActive ? "text-glow" : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                  }`
-                }
-              >
-                {n.label}
-              </NavLink>
-            ))}
-          </nav>
-        </>
-      )}
-    </div>
+    <nav
+      aria-label="Sections"
+      className="fixed inset-x-0 bottom-0 z-[1100] border-t border-border bg-surface/90 backdrop-blur-xl md:hidden"
+      // Keeps the bar clear of the iOS home indicator.
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
+      <ul className="grid grid-cols-3">
+        {NAV.map((n) => (
+          <li key={n.to}>
+            <NavLink
+              to={n.to}
+              className={({ isActive }) =>
+                `relative flex flex-col items-center gap-1 py-3 transition-colors ${
+                  isActive ? "text-glow" : "text-muted-foreground"
+                }`
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  {isActive && (
+                    <span className="absolute inset-x-6 top-0 h-0.5 rounded-full bg-glow" />
+                  )}
+                  <n.icon className="size-5" strokeWidth={1.6} />
+                  <span className="font-mono text-[10px] uppercase tracking-[0.16em]">
+                    {n.label}
+                  </span>
+                </>
+              )}
+            </NavLink>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 
@@ -145,7 +133,6 @@ function TopBar() {
           </nav>
 
           <div className="flex items-center gap-2">
-            <MobileMenu />
             <ThemeToggle />
             <WalletButton />
           </div>
@@ -185,7 +172,7 @@ export default function App() {
   return (
     <div className="flex min-h-screen flex-col">
       <TopBar />
-      <main className="flex-1 pt-24">
+      <main className="flex-1 pt-24 pb-24 md:pb-0">
         <ErrorBoundary>
           <Routes>
             <Route path="/" element={<Landing />} />
@@ -196,6 +183,7 @@ export default function App() {
         </ErrorBoundary>
       </main>
       <Footer />
+      <BottomNav />
     </div>
   );
 }
